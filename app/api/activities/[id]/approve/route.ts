@@ -1,0 +1,49 @@
+import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import { activities } from "@/db/schema";
+import { database } from "@/lib/db";
+import { apiError, requireServiceAccess } from "@/lib/api";
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = requireServiceAccess(request, "activities.approve");
+  if (denied) return denied;
+
+  const { id } = await params;
+
+  try {
+    const [activity] = await database()
+      .select()
+      .from(activities)
+      .where(eq(activities.id, id))
+      .limit(1);
+
+    if (!activity) {
+      return NextResponse.json({ error: "Activity not found." }, { status: 404 });
+    }
+
+    if (activity.approvalStatus !== "SUBMITTED") {
+      return NextResponse.json(
+        { error: "Only submitted activities can be approved." },
+        { status: 409 }
+      );
+    }
+
+    const [updated] = await database()
+      .update(activities)
+      .set({
+        approvalStatus: "APPROVED",
+        approvedAt: new Date(),
+        updatedAt: new Date(),
+        rejectionReason: null
+      })
+      .where(eq(activities.id, id))
+      .returning();
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    return apiError(error);
+  }
+}
