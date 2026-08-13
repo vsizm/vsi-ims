@@ -15,6 +15,13 @@
       "when": 1786640757123,
       "tag": "0001_overconfident_cammi",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1786644756279,
+      "tag": "0002_dapper_moira_mactaggert",
+      "breakpoints": true
     }
   ]
 }

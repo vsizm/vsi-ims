@@ -6,6 +6,14 @@ const id = {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
 };
 
+export const directorates = pgTable("directorates", {
+  ...id,
+  code: varchar("code", { length: 32 }).notNull().unique(),
+  name: varchar("name", { length: 160 }).notNull(),
+  description: text("description"),
+  active: boolean("active").default(true).notNull()
+});
+
 export const projectStatus = pgEnum("project_status", ["DRAFT","ACTIVE","ON_HOLD","CLOSED"]);
 
 export const activityStatus = pgEnum("activity_status", ["PLANNED","IN_PROGRESS","COMPLETE","CANCELLED"]);
