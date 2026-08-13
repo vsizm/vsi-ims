@@ -7,3 +7,9 @@ export const reportInput = z.object({ projectId:z.uuid(), periodStart:z.string()
 export const activityRejectionInput = z.object({
   reason: z.string().trim().min(10).max(2000)
 });
+
+export const directorateInput = z.object({
+  code: z.string().trim().min(2).max(32),
+  name: z.string().trim().min(3).max(160),
+  description: z.string().trim().max(2000).optional()
+});
