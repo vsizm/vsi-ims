@@ -1,3 +1,5 @@
-import Link from "next/link";
-const principles = ["One authoritative record for each core entity", "Protected access, approvals and auditability", "Separate Development, Staging and Production environments"];
-export default function Home() { return <main><nav><div className="brand"><span>V</span><p>VSI IMS<small>Visionary Students Initiative</small></p></div><Link className="button secondary" href="/dashboard">View demonstration</Link></nav><section className="hero"><p className="eyebrow">One source of truth</p><h1>Better information.<br/><em>Stronger</em> impact.</h1><p className="intro">The Visionary Students Initiative Information Management System brings programmes, projects, volunteers, results and governance together—so VSI can make confident decisions and deliver more for communities.</p><Link className="button" href="/dashboard">Explore VSI IMS</Link></section><section className="principles"><h2>Built for responsible growth</h2>{principles.map((item, index) => <article key={item}><b>0{index + 1}</b><p>{item}</p></article>)}</section></main>; }
+import { redirect } from "next/navigation";
+
+export default function Home() {
+  redirect("/dashboard");
+}
