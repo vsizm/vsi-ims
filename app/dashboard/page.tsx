@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { count, desc, eq } from "drizzle-orm";
-import { activities, activityStatus, programmes, projects, reports } from "@/db/schema";
+import { activities, programmes, projects, reports } from "@/db/schema";
 import { database } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
