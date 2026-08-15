@@ -18,7 +18,7 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={roboto.variable}>
-      <body>{children}</body>
+      <body style={{ fontFamily: "var(--font-vsi), sans-serif" }}>{children}</body>
     </html>
   );
 }
