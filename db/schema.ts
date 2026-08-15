@@ -1,4 +1,4 @@
-import { boolean, date, integer, numeric, pgEnum, pgTable, text, timestamp, uuid, varchar } from "drizzle-orm/pg-core";
+import { boolean, date, integer, numeric, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from "drizzle-orm/pg-core";
 
 const id = {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -134,7 +134,12 @@ export const interventionParticipants = pgTable("intervention_participants", {
   ...id,
   interventionId: uuid("intervention_id").references(() => interventions.id).notNull(),
   beneficiaryId: uuid("beneficiary_id").references(() => beneficiaries.id).notNull()
-});
+}, (table) => [
+  unique("intervention_participants_intervention_beneficiary_unique").on(
+    table.interventionId,
+    table.beneficiaryId
+  )
+]);
 
 export const indicatorLevel = pgEnum("indicator_level", ["OUTPUT", "OUTCOME"]);
 export const indicatorUnit = pgEnum("indicator_unit", ["COUNT", "PERCENTAGE", "RATE", "OTHER"]);

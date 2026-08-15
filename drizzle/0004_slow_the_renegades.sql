@@ -1,0 +1,1 @@
+ALTER TABLE "intervention_participants" ADD CONSTRAINT "intervention_participants_intervention_beneficiary_unique" UNIQUE("intervention_id","beneficiary_id");
