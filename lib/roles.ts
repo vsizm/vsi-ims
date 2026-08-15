@@ -5,7 +5,7 @@ export type Role = (typeof roles)[number];
 export const permissions: Record<Role, string[]> = {
   SYSTEM_ADMINISTRATOR:["access.manage","audit.read","configuration.manage","directorates.manage"],
   EXECUTIVE_DIRECTOR:["organisation.read","approvals.final","reports.read"],
-  PROGRAMME_MANAGER:["programmes.manage","projects.manage","activities.read","activities.manage","activities.approve","reports.read"],
+  PROGRAMME_MANAGER:["programmes.manage","projects.manage","activities.read","activities.manage","activities.approve","reports.read","reports.manage"],
   PROJECT_MANAGER:["projects.manage","activities.read","activities.manage","risks.manage"],
   FINANCE_OFFICER:["funding.manage","budgets.manage","expenditure.manage"],
   MEAL_OFFICER:["indicators.manage","results.manage","data.validate"],
