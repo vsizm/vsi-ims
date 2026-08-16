@@ -1,8 +1,52 @@
 import { eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { projects, programmes } from "@/db/schema";
+import {
+  activities,
+  indicators,
+  interventions,
+  projects,
+  programmes,
+  reports,
+} from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = requireServiceAccess(request, "programmes.manage");
+  if (denied) return denied;
+
+  const { id } = await params;
+
+  try {
+    const [programme] = await database()
+      .select()
+      .from(programmes)
+      .where(eq(programmes.id, id))
+      .limit(1);
+
+    if (!programme) {
+      return NextResponse.json(
+        { error: "Programme not found." },
+        { status: 404 }
+      );
+    }
+
+    const programmeProjects = await database()
+      .select()
+      .from(projects)
+      .where(eq(projects.programmeId, id));
+
+    return NextResponse.json({
+      ...programme,
+      projects: programmeProjects,
+    });
+  } catch (error) {
+    return apiError(error);
+  }
+}
 
 export async function DELETE(
   request: NextRequest,

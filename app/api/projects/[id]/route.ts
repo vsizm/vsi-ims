@@ -5,10 +5,54 @@ import {
   indicators,
   interventions,
   projects,
+  programmes,
   reports
 } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
+
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const denied = requireServiceAccess(request, "projects.manage");
+  if (denied) return denied;
+
+  const { id } = await params;
+
+  try {
+    const [project] = await database()
+      .select({
+        id: projects.id,
+        createdAt: projects.createdAt,
+        updatedAt: projects.updatedAt,
+        programmeId: projects.programmeId,
+        programmeCode: programmes.code,
+        programmeName: programmes.name,
+        code: projects.code,
+        name: projects.name,
+        objective: projects.objective,
+        status: projects.status,
+        startDate: projects.startDate,
+        endDate: projects.endDate
+      })
+      .from(projects)
+      .innerJoin(programmes, eq(projects.programmeId, programmes.id))
+      .where(eq(projects.id, id))
+      .limit(1);
+
+    if (!project) {
+      return NextResponse.json(
+        { error: "Project not found." },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(project);
+  } catch (error) {
+    return apiError(error);
+  }
+}
 
 export async function DELETE(
   request: NextRequest,

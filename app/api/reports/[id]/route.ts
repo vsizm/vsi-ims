@@ -8,7 +8,7 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
-  const denied = requireServiceAccess(request, "projects.manage");
+  const denied = requireServiceAccess(request, "reports.manage");
   if (denied) return denied;
 
   const { id } = await params;

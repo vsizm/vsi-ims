@@ -4,6 +4,7 @@ import { activities } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { activityRejectionInput } from "@/lib/validation";
+import { getRequestSession } from "@/lib/auth";
 
 export async function POST(
   request: NextRequest,
@@ -13,6 +14,14 @@ export async function POST(
   if (denied) return denied;
 
   const { id } = await params;
+
+  const session = getRequestSession(request);
+  if (!session) {
+    return NextResponse.json(
+      { error: "Authenticated session required." },
+      { status: 401 }
+    );
+  }
 
   const parsed = activityRejectionInput.safeParse(await request.json());
 

@@ -16,4 +16,4 @@ export const permissions: Record<Role, string[]> = {
   AUDITOR:["audit.read","reports.read"]
 };
 
-export const can = (role: Role, permission: string) => permissions[role].includes(permission);
+export const can = (role: Role, permission: string) => role === "SYSTEM_ADMINISTRATOR" || permissions[role].includes(permission);

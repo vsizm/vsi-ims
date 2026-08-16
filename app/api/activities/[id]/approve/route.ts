@@ -43,6 +43,13 @@ export async function POST(
       );
     }
 
+    if (activity.submittedByUserId === session.userId) {
+      return NextResponse.json(
+        { error: "The user who submitted an activity cannot approve it." },
+        { status: 403 }
+      );
+    }
+
     const [updated] = await database()
       .update(activities)
       .set({
