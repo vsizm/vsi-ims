@@ -1,4 +1,4 @@
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { activities, indicators, projects } from "@/db/schema";
 import { database } from "@/lib/db";
@@ -24,6 +24,6 @@ export async function POST(request: NextRequest) {
       if (activity.projectId !== parsed.data.projectId) return NextResponse.json({ error:"Activity does not belong to the selected project." }, { status:422 });
     }
     const [created] = await database().insert(indicators).values(parsed.data).returning();
-    return NextResponse.json(created, { status:201 });
+    return NextResponse.json(created, {status:201});
   } catch (error) { return apiError(error); }
 }
