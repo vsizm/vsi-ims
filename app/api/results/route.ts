@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { results } from "@/db/schema";
 import { database } from "@/lib/db";
@@ -16,6 +16,13 @@ export async function POST(request: NextRequest) {
   const parsed = resultInput.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error:"Invalid result", details:parsed.error.flatten() }, { status:422 });
   try {
+    const existing = await database().select({ id: results.id }).from(results).where(and(
+      eq(results.targetId, parsed.data.targetId),
+      eq(results.periodStart, parsed.data.periodStart),
+      eq(results.periodEnd, parsed.data.periodEnd)
+    )).limit(1);
+    if (existing[0]) return NextResponse.json({ error:"A result already exists for this target and reporting period." }, { status:409 });
+
     const [created] = await database().insert(results).values({
       targetId: parsed.data.targetId,
       periodStart: parsed.data.periodStart,
