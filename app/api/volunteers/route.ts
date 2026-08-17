@@ -1,0 +1,20 @@
+import { asc, desc, eq } from "drizzle-orm";
+import { z } from "zod";
+import { NextRequest, NextResponse } from "next/server";
+import { volunteers } from "@/db/schema";
+import { database } from "@/lib/db";
+import { apiError, requireServiceAccess } from "@/lib/api";
+
+const volunteerInput = z.object({ volunteerCode: z.string().trim().min(2).max(64), fullName: z.string().trim().min(2).max(240), email: z.string().email().max(240).optional().or(z.literal("")), phone: z.string().trim().max(40).optional(), dateOfBirth: z.string().date().optional().or(z.literal("")), sex: z.enum(["FEMALE", "MALE", "NOT_STATED"]).default("NOT_STATED"), provinceId: z.string().uuid().optional().nullable(), districtId: z.string().uuid().optional().nullable(), status: z.enum(["APPLICANT","ACTIVE","INACTIVE","ALUMNI"]).default("APPLICANT"), joinedAt: z.string().date().optional().or(z.literal("")), notes: z.string().trim().max(4000).optional() });
+
+export async function GET(request: NextRequest) {
+  const denied = requireServiceAccess(request, "volunteers.read"); if (denied) return denied;
+  try { return NextResponse.json(await database().select().from(volunteers).orderBy(asc(volunteers.status), desc(volunteers.createdAt))); } catch (error) { return apiError(error); }
+}
+
+export async function POST(request: NextRequest) {
+  const denied = requireServiceAccess(request, "volunteers.manage"); if (denied) return denied;
+  const parsed = volunteerInput.safeParse(await request.json());
+  if (!parsed.success) return NextResponse.json({ error: "Invalid volunteer", details: parsed.error.flatten() }, { status: 422 });
+  try { const [created] = await database().insert(volunteers).values(parsed.data).returning(); return NextResponse.json(created, { status: 201 }); } catch (error) { return apiError(error); }
+}
