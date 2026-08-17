@@ -22,7 +22,14 @@ export async function POST(request: NextRequest) {
     if (parsed.data.provinceId && !provinceId) return NextResponse.json({ error:"Province not found." }, { status:404 });
     if (parsed.data.districtId && !districtId) return NextResponse.json({ error:"District not found." }, { status:404 });
     if (provinceId && districtId && !(await districtBelongsToProvince(districtId, provinceId))) return NextResponse.json({ error:"District does not belong to the selected province." }, { status:422 });
-    const [created] = await database().insert(targets).values({ ...parsed.data, provinceId, districtId }).returning();
+    const [created] = await database().insert(targets).values({
+      indicatorId: parsed.data.indicatorId,
+      year: parsed.data.year,
+      targetValue: String(parsed.data.targetValue),
+      provinceId,
+      districtId,
+      notes: parsed.data.notes
+    }).returning();
     return NextResponse.json(created,{status:201});
   } catch (error) { return apiError(error); }
 }
