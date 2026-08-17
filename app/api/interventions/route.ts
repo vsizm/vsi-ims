@@ -1,6 +1,6 @@
-import { desc } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { interventions } from "@/db/schema";
+import { activities, interventions } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { interventionInput } from "@/lib/validation";
@@ -34,6 +34,27 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    if (parsed.data.activityId) {
+      const [activity] = await database()
+        .select({ id: activities.id })
+        .from(activities)
+        .where(eq(activities.id, parsed.data.activityId))
+        .limit(1);
+      if (!activity) return NextResponse.json({ error: "Activity not found." }, { status: 404 });
+
+      const [projectActivity] = await database()
+        .select({ id: activities.id })
+        .from(activities)
+        .where(and(eq(activities.id, parsed.data.activityId), eq(activities.projectId, parsed.data.projectId)))
+        .limit(1);
+      if (!projectActivity) {
+        return NextResponse.json(
+          { error: "Activity does not belong to the selected project." },
+          { status: 422 },
+        );
+      }
+    }
+
     const districtId = await resolveDistrictId(parsed.data.districtId);
     if (!districtId) {
       return NextResponse.json({ error: "District not found." }, { status: 404 });
