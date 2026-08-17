@@ -4,16 +4,16 @@ export type Role = (typeof roles)[number];
 
 export const permissions: Record<Role, string[]> = {
   SYSTEM_ADMINISTRATOR:["access.manage","audit.read","configuration.manage","directorates.manage"],
-  EXECUTIVE_DIRECTOR:["organisation.read","approvals.final","reports.read"],
-  PROGRAMME_MANAGER:["programmes.manage","projects.manage","activities.read","activities.manage","activities.approve","reports.read","reports.manage"],
-  PROJECT_MANAGER:["projects.manage","activities.read","activities.manage","risks.manage"],
+  EXECUTIVE_DIRECTOR:["organisation.read","approvals.final","reports.read","indicators.read","results.read"],
+  PROGRAMME_MANAGER:["programmes.manage","projects.manage","activities.read","activities.manage","activities.approve","reports.read","reports.manage","indicators.read","results.read"],
+  PROJECT_MANAGER:["projects.manage","activities.read","activities.manage","risks.manage","indicators.read","results.read"],
   FINANCE_OFFICER:["funding.manage","budgets.manage","expenditure.manage"],
-  MEAL_OFFICER:["indicators.manage","results.manage","data.validate"],
+  MEAL_OFFICER:["indicators.manage","indicators.read","results.manage","results.read","data.validate"],
   VOLUNTEER_COORDINATOR:["volunteers.manage","assignments.manage"],
   FIELD_OFFICER:["activities.read","attendance.write","beneficiaries.write"],
   VOLUNTEER:["profile.read","assignments.read","attendance.write"],
-  BOARD_MEMBER:["governance.read","reports.read"],
-  AUDITOR:["audit.read","reports.read"]
+  BOARD_MEMBER:["governance.read","reports.read","indicators.read","results.read"],
+  AUDITOR:["audit.read","reports.read","indicators.read","results.read"]
 };
 
-export const can = (role: Role, permission: string) => permissions[role].includes(permission);
+export const can = (role: Role, permission: string) => role === "SYSTEM_ADMINISTRATOR" || permissions[role].includes(permission);
