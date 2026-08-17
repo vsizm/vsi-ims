@@ -11,10 +11,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const rows = await database()
-      .select({
-        districtCode: districts.code,
-        beneficiaryCount: sql<number>`count(distinct ${interventionParticipants.beneficiaryId})`
-      })
+      .select({ districtCode: districts.code, beneficiaryCount: sql<number>`count(distinct ${interventionParticipants.beneficiaryId})` })
       .from(interventionParticipants)
       .innerJoin(interventions, eq(interventionParticipants.interventionId, interventions.id))
       .innerJoin(beneficiaries, eq(interventionParticipants.beneficiaryId, beneficiaries.id))
@@ -31,12 +28,11 @@ export async function GET(request: NextRequest) {
         districtName: target.districtName,
         target2030: target.target,
         actualUniqueBeneficiaries: actual,
-        progressPercent: target.target === 0 ? 0 : Number(((actual / target.target) * 100).toFixed(2))
+        progressPercent: Number(((actual / target.target) * 100).toFixed(2))
       };
     });
 
     const actualTotal = districtsReport.reduce((sum, row) => sum + row.actualUniqueBeneficiaries, 0);
-
     return NextResponse.json({
       year: 2030,
       target: VSI_2030_BENEFICIARY_TARGET,
