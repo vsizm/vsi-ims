@@ -1,0 +1,29 @@
+/* VSI application-wide readability and typography overrides. */
+body { font-family: var(--font-vsi), sans-serif !important; font-size: 15px; line-height: 1.5; }
+button, input, select, textarea { font-family: var(--font-vsi), sans-serif; }
+.sidebar-link { font-size: .94rem; }
+.workspace-label { font-size: .72rem; }
+.breadcrumb { font-size: .88rem; }
+.eyebrow { font-size: .72rem; letter-spacing: .11em; }
+.title-bar>div>p:last-child { font-size: .95rem; line-height: 1.55; }
+.primary-button { font-size: .82rem; }
+.db-status { font-size: .78rem; }
+.metric-top { font-size: .68rem; }
+.metric-card p { font-size: .88rem; }
+.metric-card small { font-size: .76rem; line-height: 1.5; }
+.section-note, .more { font-size: .78rem; }
+.section-heading h2, .panel-heading h2 { font-size: 1.18rem; }
+.workflow-step strong { font-size: .86rem; }
+.workflow-step span { font-size: .72rem; }
+.activity-main strong { font-size: .86rem; }
+.activity-main span, .activity-row time { font-size: .72rem; }
+.status { font-size: .64rem; }
+.progress-copy>strong { font-size: .9rem; }
+.progress-copy>span { font-size: .75rem; }
+.progress-copy small { font-size: .7rem; }
+.mini-metrics span { font-size: .68rem; }
+.notice-list strong { font-size: .8rem; }
+.notice-list small { font-size: .7rem; line-height: 1.45; }
+.quick-grid strong { font-size: .78rem; }
+.quick-grid small { font-size: .68rem; }
+.dashboard-footer { font-size: .68rem; }
