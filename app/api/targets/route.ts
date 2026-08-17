@@ -1,4 +1,4 @@
-import { desc } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
 import { targets } from "@/db/schema";
 import { database } from "@/lib/db";
@@ -22,6 +22,15 @@ export async function POST(request: NextRequest) {
     if (parsed.data.provinceId && !provinceId) return NextResponse.json({ error:"Province not found." }, { status:404 });
     if (parsed.data.districtId && !districtId) return NextResponse.json({ error:"District not found." }, { status:404 });
     if (provinceId && districtId && !(await districtBelongsToProvince(districtId, provinceId))) return NextResponse.json({ error:"District does not belong to the selected province." }, { status:422 });
+
+    const existing = await database().select({ id: targets.id }).from(targets).where(and(
+      eq(targets.indicatorId, parsed.data.indicatorId),
+      eq(targets.year, parsed.data.year),
+      sql`${targets.provinceId} IS NOT DISTINCT FROM ${provinceId}`,
+      sql`${targets.districtId} IS NOT DISTINCT FROM ${districtId}`
+    )).limit(1);
+    if (existing[0]) return NextResponse.json({ error:"A target already exists for this indicator, year, and geographic scope." }, { status:409 });
+
     const [created] = await database().insert(targets).values({
       indicatorId: parsed.data.indicatorId,
       year: parsed.data.year,
