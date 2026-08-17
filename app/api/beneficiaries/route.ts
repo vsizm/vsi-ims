@@ -4,7 +4,7 @@ import { beneficiaries } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { beneficiaryInput } from "@/lib/validation";
-import { resolveDeliverySiteId, resolveDistrictId, resolveProvinceId } from "@/lib/geography";
+import { deliverySiteBelongsToDistrict, districtBelongsToProvince, resolveDeliverySiteId, resolveDistrictId, resolveProvinceId } from "@/lib/geography";
 
 export async function GET(request: NextRequest) {
   const denied = requireServiceAccess(request, "beneficiaries.read"); if (denied) return denied;
@@ -23,6 +23,8 @@ export async function POST(request: NextRequest) {
     if (parsed.data.provinceId && !provinceId) return NextResponse.json({ error:"Province not found." }, { status:404 });
     if (parsed.data.districtId && !districtId) return NextResponse.json({ error:"District not found." }, { status:404 });
     if (parsed.data.deliverySiteId && !deliverySiteId) return NextResponse.json({ error:"Delivery site not found." }, { status:404 });
+    if (provinceId && districtId && !(await districtBelongsToProvince(districtId, provinceId))) return NextResponse.json({ error:"District does not belong to the selected province." }, { status:422 });
+    if (districtId && deliverySiteId && !(await deliverySiteBelongsToDistrict(deliverySiteId, districtId))) return NextResponse.json({ error:"Delivery site does not belong to the selected district." }, { status:422 });
     const [created] = await database().insert(beneficiaries).values({ ...parsed.data, provinceId, districtId, deliverySiteId }).returning();
     return NextResponse.json(created, { status:201 });
   } catch (error) { return apiError(error); }
