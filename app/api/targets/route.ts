@@ -4,7 +4,7 @@ import { targets } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { targetInput } from "@/lib/validation";
-import { resolveDistrictId, resolveProvinceId } from "@/lib/geography";
+import { districtBelongsToProvince, resolveDistrictId, resolveProvinceId } from "@/lib/geography";
 
 export async function GET(request: NextRequest) {
   const denied = requireServiceAccess(request, "results.read"); if (denied) return denied;
@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
     const districtId = parsed.data.districtId ? await resolveDistrictId(parsed.data.districtId) : null;
     if (parsed.data.provinceId && !provinceId) return NextResponse.json({ error:"Province not found." }, { status:404 });
     if (parsed.data.districtId && !districtId) return NextResponse.json({ error:"District not found." }, { status:404 });
+    if (provinceId && districtId && !(await districtBelongsToProvince(districtId, provinceId))) return NextResponse.json({ error:"District does not belong to the selected province." }, { status:422 });
     const [created] = await database().insert(targets).values({ ...parsed.data, provinceId, districtId }).returning();
     return NextResponse.json(created,{status:201});
   } catch (error) { return apiError(error); }
