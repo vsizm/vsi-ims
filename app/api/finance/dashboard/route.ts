@@ -9,22 +9,25 @@ export async function GET(request: NextRequest) {
   if (denied) return denied;
   try {
     const db = database();
-    const [budgetTotals, expenseTotals, projectRows, categoryRows] = await Promise.all([
+    const [budgetTotals, expenseTotals, projectRows, budgetRows, expenseRows, categoryRows] = await Promise.all([
       db.select({ total: sql<string>`coalesce(sum(${financeBudgets.amountZmw}), 0)` }).from(financeBudgets).where(eq(financeBudgets.status, "APPROVED")),
       db.select({ total: sql<string>`coalesce(sum(${financeExpenses.amountZmw}), 0)` }).from(financeExpenses).where(sql`${financeExpenses.status} in ('APPROVED','PAID')`),
-      db.select({ projectId: projects.id, projectCode: projects.code, projectName: projects.name, programmeCode: programmes.code, budget: sql<string>`coalesce(sum(${financeBudgets.amountZmw}), 0)`, spent: sql<string>`coalesce(sum(case when ${financeExpenses.status} in ('APPROVED','PAID') then ${financeExpenses.amountZmw} else 0 end), 0)` }).from(projects).leftJoin(programmes, eq(projects.programmeId, programmes.id)).leftJoin(financeBudgets, eq(financeBudgets.projectId, projects.id)).leftJoin(financeExpenses, eq(financeExpenses.budgetId, financeBudgets.id)).groupBy(projects.id, projects.code, projects.name, programmes.code).orderBy(projects.code),
+      db.select({ projectId: projects.id, projectCode: projects.code, projectName: projects.name, programmeCode: programmes.code }).from(projects).leftJoin(programmes, eq(projects.programmeId, programmes.id)).orderBy(projects.code),
+      db.select({ projectId: financeBudgets.projectId, amount: sql<string>`coalesce(sum(${financeBudgets.amountZmw}), 0)` }).from(financeBudgets).where(eq(financeBudgets.status, "APPROVED")).groupBy(financeBudgets.projectId),
+      db.select({ projectId: financeBudgets.projectId, amount: sql<string>`coalesce(sum(${financeExpenses.amountZmw}), 0)` }).from(financeExpenses).innerJoin(financeBudgets, eq(financeExpenses.budgetId, financeBudgets.id)).where(sql`${financeExpenses.status} in ('APPROVED','PAID')`).groupBy(financeBudgets.projectId),
       db.select({ category: financeExpenses.category, spent: sql<string>`coalesce(sum(${financeExpenses.amountZmw}), 0)` }).from(financeExpenses).where(sql`${financeExpenses.status} in ('APPROVED','PAID')`).groupBy(financeExpenses.category).orderBy(sql`sum(${financeExpenses.amountZmw}) desc`)
     ]);
     const budget = Number(budgetTotals[0]?.total ?? 0);
     const spent = Number(expenseTotals[0]?.total ?? 0);
-    const remaining = budget - spent;
+    const budgetByProject = new Map(budgetRows.map((row) => [row.projectId, Number(row.amount)]));
+    const spentByProject = new Map(expenseRows.map((row) => [row.projectId, Number(row.amount)]));
     return NextResponse.json({
       currency: "ZMW",
       budgetApprovedZmw: budget,
       expenditureZmw: spent,
-      remainingZmw: remaining,
+      remainingZmw: budget - spent,
       utilisationPercent: budget === 0 ? 0 : Number(((spent / budget) * 100).toFixed(2)),
-      projects: projectRows.map((row) => ({ ...row, budgetZmw: Number(row.budget), spentZmw: Number(row.spent), remainingZmw: Number(row.budget) - Number(row.spent) })),
+      projects: projectRows.map((row) => { const budgetZmw = budgetByProject.get(row.projectId) ?? 0; const spentZmw = spentByProject.get(row.projectId) ?? 0; return { projectCode: row.projectCode, projectName: row.projectName, programmeCode: row.programmeCode, budgetZmw, spentZmw, remainingZmw: budgetZmw - spentZmw }; }),
       categories: categoryRows.map((row) => ({ category: row.category, spentZmw: Number(row.spent) }))
     });
   } catch (error) { return apiError(error); }
