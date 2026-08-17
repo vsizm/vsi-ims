@@ -1,0 +1,14 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {"idx":0,"version":"7","when":1786638400938,"tag":"0000_violet_lila_cheney","breakpoints":true},
+    {"idx":1,"version":"7","when":1786640757123,"tag":"0001_overconfident_cammi","breakpoints":true},
+    {"idx":2,"version":"7","when":1786644756279,"tag":"0002_dapper_moira_mactaggert","breakpoints":true},
+    {"idx":3,"version":"7","when":1786774195648,"tag":"0003_jazzy_tony_stark","breakpoints":true},
+    {"idx":4,"version":"7","when":1786774495075,"tag":"0004_slow_the_renegades","breakpoints":true},
+    {"idx":5,"version":"7","when":1786810000000,"tag":"0005_v1_target_result_uniqueness","breakpoints":true},
+    {"idx":6,"version":"7","when":1786996000000,"tag":"0006_finance_zmw_foundation","breakpoints":true},
+    {"idx":7,"version":"7","when":1786997000000,"tag":"0007_volunteer_management","breakpoints":true}
+  ]
+}
