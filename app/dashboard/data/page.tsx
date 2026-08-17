@@ -53,7 +53,8 @@ export default function DataPage() {
 
   async function loadSites(districtId: string) {
     if (!districtId) { setData((current) => ({ ...current, sites: [] })); return; }
-    setData((current) => ({ ...current, sites: await api(`/api/delivery-sites?districtId=${encodeURIComponent(districtId)}`) }));
+    const sites = await api(`/api/delivery-sites?districtId=${encodeURIComponent(districtId)}`);
+    setData((current) => ({ ...current, sites }));
   }
 
   async function submit(event: FormEvent, path: string, section: string, success: string) {
