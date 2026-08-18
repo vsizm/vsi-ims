@@ -10,7 +10,7 @@ export async function GET(request: NextRequest) {
   if (denied) return denied;
 
   try {
-    const [overall] = await database().execute(sql`
+    const overall = await database().execute(sql`
       select count(distinct ip.beneficiary_id)::int as unique_beneficiaries
       from intervention_participants ip
       inner join beneficiaries b on b.id = ip.beneficiary_id
@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       order by d.name
     `);
 
-    const uniqueBeneficiaries = Number(overall?.unique_beneficiaries ?? 0);
+    const uniqueBeneficiaries = Number(overall.rows[0]?.unique_beneficiaries ?? 0);
     return NextResponse.json({
       target: TARGET,
       uniqueBeneficiaries,
