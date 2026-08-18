@@ -5,6 +5,7 @@ import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { getRequestSession } from "@/lib/auth";
 import { reportInput } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const denied = requireServiceAccess(request, "reports.read"); if (denied) return denied;
@@ -22,6 +23,7 @@ export async function POST(request: NextRequest) {
     const [project] = await database().select({id:projects.id}).from(projects).where(eq(projects.id, parsed.data.projectId)).limit(1);
     if (!project) return NextResponse.json({error:"Project not found."},{status:404});
     const [created] = await database().insert(reports).values({...parsed.data, submittedByUserId:session.userId}).returning();
+    await recordAuditEvent({ actorUserId: session.userId, action: "REPORT_CREATED", entityType: "report", entityId: created.id, afterValue: { projectId: created.projectId, periodStart: created.periodStart, periodEnd: created.periodEnd } });
     return NextResponse.json(created,{status:201});
   } catch (error) { return apiError(error); }
 }
