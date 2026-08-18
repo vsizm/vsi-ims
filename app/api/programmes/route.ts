@@ -1,6 +1,6 @@
-import { desc } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { programmes } from "@/db/schema";
+import { directorates, programmes } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { getRequestSession } from "@/lib/auth";
@@ -25,8 +25,13 @@ export async function POST(request: NextRequest) {
   const parsed = programmeInput.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Invalid programme", details: parsed.error.flatten() }, { status: 422 });
   try {
-    const [created] = await database().insert(programmes).values(parsed.data).returning();
-    await recordAuditEvent({ actorUserId: session.userId, action: "PROGRAMME_CREATED", entityType: "programme", entityId: created.id, afterValue: { code: created.code, name: created.name, active: created.active } });
+    const db = database();
+    if (parsed.data.directorateId) {
+      const [directorate] = await db.select({ id: directorates.id }).from(directorates).where(eq(directorates.id, parsed.data.directorateId)).limit(1);
+      if (!directorate) return NextResponse.json({ error: "Directorate not found." }, { status: 404 });
+    }
+    const [created] = await db.insert(programmes).values(parsed.data).returning();
+    await recordAuditEvent({ actorUserId: session.userId, action: "PROGRAMME_CREATED", entityType: "programme", entityId: created.id, afterValue: { code: created.code, name: created.name, active: created.active, directorateId: created.directorateId } });
     return NextResponse.json(created, { status: 201 });
   } catch (error) {
     return apiError(error);
