@@ -9,11 +9,11 @@ export function requireServiceAccess(request: NextRequest, permission: string) {
     return null;
   }
 
-  const expected = process.env.VSI_INTERNAL_API_KEY;
+  const expectedKey = process.env.VSI_INTERNAL_API_KEY;
   const supplied = request.headers.get("authorization");
-  const role = request.headers.get("x-vsi-role") as Role | null;
-  if (!expected || supplied !== `Bearer ${expected}`) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
-  if (!role || !roles.includes(role) || !can(role, permission)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  const serviceRole = process.env.VSI_INTERNAL_API_ROLE as Role | undefined;
+  if (!expectedKey || supplied !== `Bearer ${expectedKey}`) return NextResponse.json({ error: "Unauthorised" }, { status: 401 });
+  if (!serviceRole || !roles.includes(serviceRole) || !can(serviceRole, permission)) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   return null;
 }
 
