@@ -2,63 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-type FinanceData = {
-  currency: "ZMW";
-  budgetApprovedZmw: number;
-  expenditureZmw: number;
-  remainingZmw: number;
-  utilisationPercent: number;
-  projects: Array<{ projectCode: string; projectName: string; programmeCode: string | null; budgetZmw: number; spentZmw: number; remainingZmw: number }>;
-  categories: Array<{ category: string; spentZmw: number }>;
-};
-
+type Row = { code: string; name: string; directorateCode?: string | null; programmeCode?: string | null; budgetZmw: number; committedZmw: number; spentZmw: number; remainingZmw: number; utilisationPercent: number };
+type FinanceData = { currency: "ZMW"; financialYear: number; budgetApprovedZmw: number; expenditureZmw: number; committedZmw: number; remainingZmw: number; uncommittedZmw: number; utilisationPercent: number; committedPercent: number; allocationSummary: { directorateBudgetZmw: number; programmeAllocationZmw: number; projectAllocationZmw: number; activityAllocationZmw: number }; directorates: Row[]; programmes: Row[]; projects: Array<Row & { projectCode: string; projectName: string; programmeCode: string | null; directorateCode: string | null }>; categories: Array<{ category: string; spentZmw: number }> };
 const money = (value: number) => new Intl.NumberFormat("en-ZM", { style: "currency", currency: "ZMW", maximumFractionDigits: 2 }).format(value);
+const yearNow = new Date().getUTCFullYear();
 
 export default function FinancialIntelligencePage() {
+  const [year, setYear] = useState(yearNow);
   const [data, setData] = useState<FinanceData | null>(null);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    fetch("/api/finance/dashboard", { cache: "no-store" })
-      .then(async (response) => { if (!response.ok) throw new Error("Unable to load financial intelligence."); return response.json(); })
-      .then(setData)
-      .catch((reason: Error) => setError(reason.message));
-  }, []);
-
+  useEffect(() => { setData(null); setError(""); fetch(`/api/finance/dashboard?year=${year}`, { cache: "no-store" }).then(async (r) => { if (!r.ok) throw new Error("Unable to load financial intelligence."); return r.json(); }).then(setData).catch((e: Error) => setError(e.message)); }, [year]);
   const largestCategory = useMemo(() => data?.categories[0]?.category ?? "—", [data]);
-
-  return (
-    <main className="ims-shell">
-      <aside className="sidebar">
-        <div className="sidebar-brand"><div className="brand-mark">VSI</div><div><strong>VSI IMS</strong><span>Information Management</span></div></div>
-        <div className="workspace-label">WORKSPACE</div>
-        <nav className="sidebar-nav" aria-label="Main navigation">
-          <a className="sidebar-link" href="/dashboard"><span className="nav-icon">⌂</span><span>Dashboard</span></a>
-          <a className="sidebar-link" href="/dashboard/workflow#programmes"><span className="nav-icon">▣</span><span>Programmes</span></a>
-          <a className="sidebar-link" href="/dashboard/workflow#projects"><span className="nav-icon">◫</span><span>Projects</span></a>
-          <a className="sidebar-link" href="/dashboard/workflow#activities"><span className="nav-icon">✓</span><span>Activities</span></a>
-          <a className="sidebar-link" href="/dashboard/workflow#reports"><span className="nav-icon">▤</span><span>Reports</span></a>
-          <a className="sidebar-link active" href="/dashboard/finance"><span className="nav-icon">₭</span><span>Financial Intelligence</span></a>
-        </nav>
-      </aside>
-      <section className="workspace">
-        <header className="topbar"><div className="breadcrumb"><span>VSI IMS</span><i>/</i><strong>Financial Intelligence</strong></div><div className="top-actions"><span className="env-pill"><span /> Connected</span><div className="top-avatar">PA</div></div></header>
-        <div className="page-content">
-          <div className="title-bar"><div><p className="eyebrow">FINANCE</p><h1>Financial Intelligence</h1><p>Management visibility over approved budgets and recognised expenditure.</p></div><div className="title-actions"><span className="db-status"><span /> ZMW</span></div></div>
-          {error ? <section className="panel" style={{ marginTop: 18, color: "#8a2b2b", fontSize: 16 }}>{error}</section> : !data ? <section className="panel" style={{ marginTop: 18, fontSize: 16 }}>Loading financial intelligence…</section> : <>
-            <section className="stats-grid" aria-label="Financial metrics">
-              <article className="metric-card metric-navy"><div className="metric-top"><span>APPROVED BUDGET</span><span className="metric-icon">₭</span></div><strong>{money(data.budgetApprovedZmw)}</strong><p>Approved budget</p><small>Authoritative approved budget records</small></article>
-              <article className="metric-card metric-blue"><div className="metric-top"><span>EXPENDITURE</span><span className="metric-icon">↗</span></div><strong>{money(data.expenditureZmw)}</strong><p>Recognised expenditure</p><small>Approved and paid expenditure</small></article>
-              <article className="metric-card metric-gold"><div className="metric-top"><span>REMAINING</span><span className="metric-icon">✓</span></div><strong>{money(data.remainingZmw)}</strong><p>Available balance</p><small>Approved budget less recognised expenditure</small></article>
-              <article className="metric-card metric-light"><div className="metric-top"><span>UTILISATION</span><span className="metric-icon">%</span></div><strong>{data.utilisationPercent}%</strong><p>Budget utilisation</p><small>Expenditure as a share of approved budget</small></article>
-            </section>
-            <div className="dashboard-grid">
-              <section className="panel"><div className="panel-heading"><div><p className="eyebrow dark">PROJECT FINANCE</p><h2>Budget position by project</h2></div></div><div className="activity-table">{data.projects.length === 0 ? <div className="more">No approved budgets have been recorded yet.</div> : data.projects.map((project) => <article className="activity-row" key={project.projectCode}><div className="activity-mark blue">₭</div><div className="activity-main"><strong>{project.projectCode} · {project.projectName}</strong><span>{project.programmeCode ?? "Programme"} · Budget {money(project.budgetZmw)} · Spent {money(project.spentZmw)}</span></div><span className="status blue">{project.budgetZmw === 0 ? "NO BUDGET" : `${Math.round((project.spentZmw / project.budgetZmw) * 100)}%`}</span><time>{money(project.remainingZmw)}</time></article>)}</div></section>
-              <section className="panel"><div className="panel-heading"><div><p className="eyebrow dark">EXPENDITURE MIX</p><h2>Spend by category</h2></div></div><div className="notice-list">{data.categories.length === 0 ? <div className="more">No recognised expenditure has been recorded yet.</div> : data.categories.map((category) => <div key={category.category}><span className="notice-dot blue-dot" /><p><strong>{category.category}</strong><small>{money(category.spentZmw)}</small></p><b>{data.expenditureZmw === 0 ? "0%" : `${Math.round((category.spentZmw / data.expenditureZmw) * 100)}%`}</b></div>)}</div><div className="mini-metrics"><div><strong>{data.projects.length}</strong><span>Projects with finance records</span></div><div><strong>{data.categories.length}</strong><span>Expense categories</span></div><div><strong>{largestCategory}</strong><span>Largest category</span></div></div></section>
-            </div>
-          </>}
-        </div>
-      </section>
-    </main>
-  );
+  return <main className="ims-shell">
+    <aside className="sidebar"><div className="sidebar-brand"><div className="brand-mark">VSI</div><div><strong>VSI IMS</strong><span>Information Management</span></div></div><div className="workspace-label">WORKSPACE</div><nav className="sidebar-nav" aria-label="Main navigation"><a className="sidebar-link" href="/dashboard"><span className="nav-icon">⌂</span><span>Dashboard</span></a><a className="sidebar-link" href="/dashboard/workflow#programmes"><span className="nav-icon">▣</span><span>Programmes</span></a><a className="sidebar-link" href="/dashboard/workflow#projects"><span className="nav-icon">◫</span><span>Projects</span></a><a className="sidebar-link" href="/dashboard/workflow#activities"><span className="nav-icon">✓</span><span>Activities</span></a><a className="sidebar-link" href="/dashboard/workflow#reports"><span className="nav-icon">▤</span><span>Reports</span></a><a className="sidebar-link active" href="/dashboard/finance"><span className="nav-icon">₭</span><span>Financial Intelligence</span></a></nav></aside>
+    <section className="workspace"><header className="topbar"><div className="breadcrumb"><span>VSI IMS</span><i>/</i><strong>Financial Intelligence</strong></div><div className="top-actions"><span className="env-pill"><span /> Connected</span><div className="top-avatar">PA</div></div></header><div className="page-content">
+      <div className="title-bar"><div><p className="eyebrow">FINANCE</p><h1>Financial Intelligence</h1><p>Budget, commitment, expenditure and variance from the governed financial hierarchy.</p></div><div className="title-actions"><label className="db-status">Financial year <select value={year} onChange={(e) => setYear(Number(e.target.value))}><option value={yearNow - 1}>{yearNow - 1}</option><option value={yearNow}>{yearNow}</option><option value={yearNow + 1}>{yearNow + 1}</option></select></label></div></div>
+      {error ? <section className="panel" style={{ marginTop: 18, color: "#8a2b2b", fontSize: 16 }}>{error}</section> : !data ? <section className="panel" style={{ marginTop: 18, fontSize: 16 }}>Loading financial intelligence…</section> : <>
+        <section className="stats-grid" aria-label="Financial metrics"><article className="metric-card metric-navy"><div className="metric-top"><span>DIRECTORATE BUDGET</span><span className="metric-icon">₭</span></div><strong>{money(data.budgetApprovedZmw)}</strong><p>Approved top-level budget</p><small>Organisation-level budget; child allocations are not double-counted</small></article><article className="metric-card metric-blue"><div className="metric-top"><span>COMMITTED</span><span className="metric-icon">↗</span></div><strong>{money(data.committedZmw)}</strong><p>Committed expenditure</p><small>{data.committedPercent}% of top-level budget</small></article><article className="metric-card metric-gold"><div className="metric-top"><span>PAID</span><span className="metric-icon">✓</span></div><strong>{money(data.expenditureZmw)}</strong><p>Actual paid expenditure</p><small>{data.utilisationPercent}% budget utilisation</small></article><article className="metric-card metric-light"><div className="metric-top"><span>AVAILABLE</span><span className="metric-icon">%</span></div><strong>{money(data.remainingZmw)}</strong><p>Budget remaining</p><small>{money(data.uncommittedZmw)} not yet committed</small></article></section>
+        <section className="panel" style={{ marginTop: 18 }}><div className="panel-heading"><div><p className="eyebrow dark">ALLOCATION CONTROL</p><h2>Budget flowing down the organisation</h2></div><span className="more">FY {data.financialYear}</span></div><div className="mini-metrics"><div><strong>{money(data.allocationSummary.directorateBudgetZmw)}</strong><span>Directorate budget</span></div><div><strong>{money(data.allocationSummary.programmeAllocationZmw)}</strong><span>Programme allocations</span></div><div><strong>{money(data.allocationSummary.projectAllocationZmw)}</strong><span>Project allocations</span></div><div><strong>{money(data.allocationSummary.activityAllocationZmw)}</strong><span>Activity allocations</span></div></div></section>
+        <div className="dashboard-grid"><section className="panel"><div className="panel-heading"><div><p className="eyebrow dark">DIRECTORATE POSITION</p><h2>Directorates</h2></div></div><div className="activity-table">{data.directorates.length === 0 ? <div className="more">No approved Directorate budgets for this year.</div> : data.directorates.map((row) => <article className="activity-row" key={row.code}><div className="activity-mark navy">₭</div><div className="activity-main"><strong>{row.code} · {row.name}</strong><span>Budget {money(row.budgetZmw)} · Committed {money(row.committedZmw)} · Paid {money(row.spentZmw)}</span></div><span className="status blue">{row.utilisationPercent}%</span><time>{money(row.remainingZmw)}</time></article>)}</div></section><section className="panel"><div className="panel-heading"><div><p className="eyebrow dark">PROGRAMME POSITION</p><h2>Programmes</h2></div></div><div className="activity-table">{data.programmes.length === 0 ? <div className="more">No approved Programme allocations for this year.</div> : data.programmes.map((row) => <article className="activity-row" key={row.code}><div className="activity-mark blue">₭</div><div className="activity-main"><strong>{row.code} · {row.name}</strong><span>{row.directorateCode ?? "Directorate"} · Budget {money(row.budgetZmw)} · Paid {money(row.spentZmw)}</span></div><span className="status blue">{row.utilisationPercent}%</span><time>{money(row.remainingZmw)}</time></article>)}</div></section></div>
+        <section className="panel" style={{ marginTop: 18 }}><div className="panel-heading"><div><p className="eyebrow dark">PROJECT POSITION</p><h2>Projects</h2></div></div><div className="activity-table">{data.projects.length === 0 ? <div className="more">No approved Project budgets for this year.</div> : data.projects.map((row) => <article className="activity-row" key={row.projectCode}><div className="activity-mark blue">₭</div><div className="activity-main"><strong>{row.projectCode} · {row.projectName}</strong><span>{row.directorateCode ?? "Directorate"} · {row.programmeCode ?? "Programme"} · Budget {money(row.budgetZmw)} · Committed {money(row.committedZmw)} · Paid {money(row.spentZmw)}</span></div><span className="status blue">{row.utilisationPercent}%</span><time>{money(row.remainingZmw)}</time></article>)}</div></section>
+        <section className="dashboard-grid" style={{ marginTop: 18 }}><section className="panel"><div className="panel-heading"><div><p className="eyebrow dark">EXPENDITURE MIX</p><h2>Paid expenditure by category</h2></div></div><div className="notice-list">{data.categories.length === 0 ? <div className="more">No paid expenditure recorded for this year.</div> : data.categories.map((category) => <div key={category.category}><span className="notice-dot blue-dot"/><p><strong>{category.category}</strong><small>{money(category.spentZmw)}</small></p><b>{data.expenditureZmw === 0 ? "0%" : `${Math.round((category.spentZmw / data.expenditureZmw) * 100)}%`}</b></div>)}</div></section><section className="panel"><div className="panel-heading"><div><p className="eyebrow dark">POSITION</p><h2>Management view</h2></div></div><div className="mini-metrics"><div><strong>{data.directorates.length}</strong><span>Directorates</span></div><div><strong>{data.programmes.length}</strong><span>Programmes funded</span></div><div><strong>{data.projects.length}</strong><span>Projects funded</span></div><div><strong>{largestCategory}</strong><span>Largest spend category</span></div></div><p style={{ marginTop: 18, color: "var(--ink-muted)" }}>Parent budgets and child allocations are reported separately so organisational totals are not inflated by double-counting.</p></section></div>
+      </>}
+    </div></section></main>;
 }
