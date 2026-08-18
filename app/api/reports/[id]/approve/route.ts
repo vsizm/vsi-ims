@@ -17,6 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const [report] = await database().select().from(reports).where(eq(reports.id, id)).limit(1);
     if (!report) return NextResponse.json({ error: "Report not found." }, { status: 404 });
     if (report.approvedAt) return NextResponse.json({ error: "Report is already approved." }, { status: 409 });
+    if (report.submittedByUserId === session.userId) return NextResponse.json({ error: "A user cannot approve a report they submitted." }, { status: 403 });
 
     const approvedAt = new Date();
     const [updated] = await database().update(reports).set({ approvedAt, updatedAt: approvedAt }).where(eq(reports.id, id)).returning();

@@ -17,6 +17,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const [activity] = await database().select().from(activities).where(eq(activities.id, id)).limit(1);
     if (!activity) return NextResponse.json({ error: "Activity not found." }, { status: 404 });
     if (activity.approvalStatus !== "SUBMITTED") return NextResponse.json({ error: "Only submitted activities can be approved." }, { status: 409 });
+    if (activity.submittedByUserId === session.userId) return NextResponse.json({ error: "A user cannot approve an activity they submitted." }, { status: 403 });
 
     const [updated] = await database().update(activities).set({
       approvalStatus: "APPROVED",
