@@ -6,6 +6,17 @@ import { directorates, financeBudgets, financeExpenses, programmes, projects } f
 
 const toNumber = (value: unknown) => Number(value ?? 0);
 
+type Attention = {
+  severity: "CRITICAL" | "HIGH" | "MEDIUM";
+  type: "OVER_BUDGET" | "HIGH_UTILISATION" | "LOW_UNCOMMITTED" | "NO_SPEND";
+  scope: "ORGANISATION" | "DIRECTORATE" | "PROGRAMME" | "PROJECT";
+  code: string;
+  name: string;
+  message: string;
+  recommendation: string;
+  decision: string;
+};
+
 export async function GET(request: NextRequest) {
   const denied = requireServiceAccess(request, "finance.dashboard.read");
   if (denied) return denied;
@@ -51,9 +62,28 @@ export async function GET(request: NextRequest) {
     const spent = approved.reduce((sum, row) => sum + (expenseByBudget.get(row.id)?.paid ?? 0), 0);
     const utilisationPercent = directorateBudget === 0 ? 0 : Number(((spent / directorateBudget) * 100).toFixed(2));
     const committedPercent = directorateBudget === 0 ? 0 : Number(((committed / directorateBudget) * 100).toFixed(2));
+    const attention: Attention[] = [];
+    const addSignals = (scope: Attention["scope"], rows: Array<{ code: string; name: string; budgetZmw: number; committedZmw: number; spentZmw: number }>) => {
+      for (const row of rows) {
+        if (row.budgetZmw <= 0) continue;
+        const utilisation = (row.spentZmw / row.budgetZmw) * 100;
+        const commitment = (row.committedZmw / row.budgetZmw) * 100;
+        if (utilisation > 100) attention.push({ severity: "CRITICAL", type: "OVER_BUDGET", scope, code: row.code, name: row.name, message: `Paid expenditure is ${utilisation.toFixed(1)}% of the approved budget.`, recommendation: "Freeze discretionary spend and reconcile the variance before further commitments.", decision: "Management decision required: approve corrective action or reforecast." });
+        else if (utilisation >= 80) attention.push({ severity: "HIGH", type: "HIGH_UTILISATION", scope, code: row.code, name: row.name, message: `Paid expenditure has reached ${utilisation.toFixed(1)}% of budget.`, recommendation: "Review remaining activities, commitments and forecast-to-complete before additional spending.", decision: "Decide whether the remaining budget is sufficient or a controlled reallocation is needed." });
+        else if (commitment >= 90) attention.push({ severity: "HIGH", type: "LOW_UNCOMMITTED", scope, code: row.code, name: row.name, message: `${commitment.toFixed(1)}% of budget is already committed.`, recommendation: "Review outstanding commitments and protect funds for essential planned work.", decision: "Decide whether to release, retain or reallocate outstanding commitments." });
+        else if (row.spentZmw === 0) attention.push({ severity: "MEDIUM", type: "NO_SPEND", scope, code: row.code, name: row.name, message: "An approved budget has no recorded paid expenditure.", recommendation: "Confirm implementation status and whether funds are still required for the approved plan.", decision: "Decide whether to accelerate delivery, revise the plan or reallocate funds." });
+      }
+    };
+    addSignals("DIRECTORATE", [...directorateMap.values()]);
+    addSignals("PROGRAMME", [...programmeMap.values()]);
+    addSignals("PROJECT", [...projectMap.values()]);
+    if (directorateBudget > 0 && programmeAllocations === 0) attention.push({ severity: "HIGH", type: "LOW_UNCOMMITTED", scope: "ORGANISATION", code: "ORG", name: "Organisation", message: "Approved Directorate budget has no approved Programme allocations.", recommendation: "Complete programme-level budgeting before relying on the available balance as deployable programme funding.", decision: "Management decision required: confirm programme priorities and allocation plan." });
+    attention.sort((a, b) => ({ CRITICAL: 0, HIGH: 1, MEDIUM: 2 }[a.severity] - { CRITICAL: 0, HIGH: 1, MEDIUM: 2 }[b.severity]));
     return NextResponse.json({
       currency: "ZMW", financialYear, budgetApprovedZmw: directorateBudget, expenditureZmw: spent, committedZmw: committed, remainingZmw: directorateBudget - spent, uncommittedZmw: directorateBudget - committed, utilisationPercent, committedPercent,
       allocationSummary: { directorateBudgetZmw: directorateBudget, programmeAllocationZmw: programmeAllocations, projectAllocationZmw: projectAllocations, activityAllocationZmw: activityAllocations },
+      attention,
+      attentionSummary: { critical: attention.filter((item) => item.severity === "CRITICAL").length, high: attention.filter((item) => item.severity === "HIGH").length, medium: attention.filter((item) => item.severity === "MEDIUM").length },
       directorates: [...directorateMap.values()].map((row) => ({ ...row, remainingZmw: row.budgetZmw - row.spentZmw, utilisationPercent: row.budgetZmw === 0 ? 0 : Number(((row.spentZmw / row.budgetZmw) * 100).toFixed(2)) })),
       programmes: [...programmeMap.values()].map((row) => ({ ...row, remainingZmw: row.budgetZmw - row.spentZmw, utilisationPercent: row.budgetZmw === 0 ? 0 : Number(((row.spentZmw / row.budgetZmw) * 100).toFixed(2)) })),
       projects: projectRows.map((row) => { const finance = projectMap.get(row.projectId); const budgetZmw = finance?.budgetZmw ?? 0; const spentZmw = finance?.spentZmw ?? 0; const committedZmw = finance?.committedZmw ?? 0; return { projectCode: row.projectCode, projectName: row.projectName, programmeCode: row.programmeCode, programmeName: row.programmeName, directorateCode: row.directorateCode, directorateName: row.directorateName, budgetZmw, committedZmw, spentZmw, remainingZmw: budgetZmw - spentZmw, utilisationPercent: budgetZmw === 0 ? 0 : Number(((spentZmw / budgetZmw) * 100).toFixed(2)) }; }).filter((row) => row.budgetZmw > 0 || row.spentZmw > 0 || row.committedZmw > 0),
