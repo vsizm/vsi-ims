@@ -7,6 +7,12 @@ import { auditEvents, managementActions } from "@/db/schema";
 
 const statuses = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
 const severities = new Set(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
+const transitions: Record<string, Set<string>> = {
+  OPEN: new Set(["OPEN", "IN_PROGRESS", "CANCELLED"]),
+  IN_PROGRESS: new Set(["IN_PROGRESS", "COMPLETED", "CANCELLED"]),
+  COMPLETED: new Set(["COMPLETED"]),
+  CANCELLED: new Set(["CANCELLED"]),
+};
 
 export async function GET(request: NextRequest) {
   const denied = requireServiceAccess(request, "management.actions.read");
@@ -40,8 +46,9 @@ export async function POST(request: NextRequest) {
     const finding = String(body.finding ?? "").trim();
     const recommendation = String(body.recommendation ?? "").trim();
     if (!entityType || !entityId || !source || !finding || !recommendation || !severities.has(severity)) return NextResponse.json({ error: "entityType, entityId, source, severity, finding and recommendation are required" }, { status: 400 });
+    const decision = body.decision ? String(body.decision).trim() : null;
     const db = database();
-    const [created] = await db.insert(managementActions).values({ entityType, entityId, source, severity, finding, recommendation, decision: body.decision ? String(body.decision).trim() : null, actionOwnerUserId: body.actionOwnerUserId ? String(body.actionOwnerUserId) : null, dueDate: body.dueDate ? String(body.dueDate) : null }).returning();
+    const [created] = await db.insert(managementActions).values({ entityType, entityId, source, severity, finding, recommendation, decision, decisionByUserId: decision ? session.userId : null, decisionAt: decision ? new Date() : null, actionOwnerUserId: body.actionOwnerUserId ? String(body.actionOwnerUserId) : null, dueDate: body.dueDate ? String(body.dueDate) : null }).returning();
     await db.insert(auditEvents).values({ actorUserId: session.userId, action: "MANAGEMENT_ACTION_CREATED", entityType: "MANAGEMENT_ACTION", entityId: created.id, afterValue: JSON.stringify(created) });
     return NextResponse.json({ action: created }, { status: 201 });
   } catch (error) { return apiError(error); }
@@ -59,12 +66,19 @@ export async function PATCH(request: NextRequest) {
     const db = database();
     const [before] = await db.select().from(managementActions).where(eq(managementActions.id, id));
     if (!before) return NextResponse.json({ error: "Management action not found" }, { status: 404 });
+    const requestedStatus = body.status === undefined ? before.status : String(body.status).toUpperCase();
+    if (!statuses.has(requestedStatus)) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+    if (!transitions[before.status]?.has(requestedStatus)) return NextResponse.json({ error: `Invalid management action transition: ${before.status} to ${requestedStatus}` }, { status: 409 });
+    const requestedOwner = body.actionOwnerUserId === undefined ? before.actionOwnerUserId : body.actionOwnerUserId ? String(body.actionOwnerUserId) : null;
+    const requestedResolution = body.resolution === undefined ? before.resolution : body.resolution ? String(body.resolution).trim() : null;
+    if (requestedStatus === "IN_PROGRESS" && !requestedOwner) return NextResponse.json({ error: "An action owner is required before an action can move to IN_PROGRESS" }, { status: 400 });
+    if (requestedStatus === "COMPLETED" && (!requestedOwner || !requestedResolution)) return NextResponse.json({ error: "An action owner and resolution are required before an action can be completed" }, { status: 400 });
     const updates: Record<string, unknown> = { updatedAt: new Date() };
-    if (body.decision !== undefined) { updates.decision = body.decision ? String(body.decision).trim() : null; updates.decisionByUserId = session.userId; updates.decisionAt = new Date(); }
-    if (body.actionOwnerUserId !== undefined) updates.actionOwnerUserId = body.actionOwnerUserId ? String(body.actionOwnerUserId) : null;
+    if (body.decision !== undefined) { updates.decision = body.decision ? String(body.decision).trim() : null; updates.decisionByUserId = body.decision ? session.userId : null; updates.decisionAt = body.decision ? new Date() : null; }
+    if (body.actionOwnerUserId !== undefined) updates.actionOwnerUserId = requestedOwner;
     if (body.dueDate !== undefined) updates.dueDate = body.dueDate ? String(body.dueDate) : null;
-    if (body.status !== undefined) { const status = String(body.status).toUpperCase(); if (!statuses.has(status)) return NextResponse.json({ error: "Invalid status" }, { status: 400 }); updates.status = status; }
-    if (body.resolution !== undefined) updates.resolution = body.resolution ? String(body.resolution).trim() : null;
+    if (body.status !== undefined) updates.status = requestedStatus;
+    if (body.resolution !== undefined) updates.resolution = requestedResolution;
     const [after] = await db.update(managementActions).set(updates).where(eq(managementActions.id, id)).returning();
     await db.insert(auditEvents).values({ actorUserId: session.userId, action: "MANAGEMENT_ACTION_UPDATED", entityType: "MANAGEMENT_ACTION", entityId: id, beforeValue: JSON.stringify(before), afterValue: JSON.stringify(after) });
     return NextResponse.json({ action: after });
