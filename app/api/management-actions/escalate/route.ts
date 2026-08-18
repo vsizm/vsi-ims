@@ -5,7 +5,6 @@ import { apiError, requireServiceAccess } from "@/lib/api";
 import { getRequestSession } from "@/lib/auth";
 import { auditEvents, managementActions } from "@/db/schema";
 
-const activeStatuses = ["OPEN", "IN_PROGRESS"] as const;
 const escalation: Record<string, string> = { LOW: "MEDIUM", MEDIUM: "HIGH", HIGH: "CRITICAL", CRITICAL: "CRITICAL" };
 
 function todayUtc() {
