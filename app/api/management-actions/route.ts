@@ -9,7 +9,7 @@ const statuses = new Set(["OPEN", "IN_PROGRESS", "COMPLETED", "CANCELLED"]);
 const severities = new Set(["CRITICAL", "HIGH", "MEDIUM", "LOW"]);
 
 export async function GET(request: NextRequest) {
-  const denied = requireServiceAccess(request, "finance.dashboard.read");
+  const denied = requireServiceAccess(request, "management.actions.read");
   if (denied) return denied;
   try {
     const params = new URL(request.url).searchParams;
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = requireServiceAccess(request, "budgets.manage");
+  const denied = requireServiceAccess(request, "management.actions.manage");
   if (denied) return denied;
   const session = getRequestSession(request);
   if (!session) return NextResponse.json({ error: "Authenticated session required" }, { status: 401 });
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
 }
 
 export async function PATCH(request: NextRequest) {
-  const denied = requireServiceAccess(request, "budgets.manage");
+  const denied = requireServiceAccess(request, "management.actions.manage");
   if (denied) return denied;
   const session = getRequestSession(request);
   if (!session) return NextResponse.json({ error: "Authenticated session required" }, { status: 401 });
