@@ -3,8 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { beneficiaries } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
+import { getRequestSession } from "@/lib/auth";
 import { beneficiaryInput } from "@/lib/validation";
 import { deliverySiteBelongsToDistrict, districtBelongsToProvince, resolveDeliverySiteId, resolveDistrictId, resolveProvinceId } from "@/lib/geography";
+import { recordAuditEvent } from "@/lib/audit";
 
 export async function GET(request: NextRequest) {
   const denied = requireServiceAccess(request, "beneficiaries.read"); if (denied) return denied;
@@ -14,6 +16,8 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const denied = requireServiceAccess(request, "beneficiaries.write"); if (denied) return denied;
+  const session = getRequestSession(request);
+  if (!session) return NextResponse.json({ error:"Authenticated session required." }, {status:401});
   const parsed = beneficiaryInput.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error:"Invalid beneficiary", details:parsed.error.flatten() }, { status:422 });
   try {
@@ -28,6 +32,7 @@ export async function POST(request: NextRequest) {
     if (provinceId && districtId && !(await districtBelongsToProvince(districtId, provinceId))) return NextResponse.json({ error:"District does not belong to the selected province." }, { status:422 });
     if (districtId && deliverySiteId && !(await deliverySiteBelongsToDistrict(deliverySiteId, districtId))) return NextResponse.json({ error:"Delivery site does not belong to the selected district." }, { status:422 });
     const [created] = await database().insert(beneficiaries).values({ ...parsed.data, provinceId, districtId, deliverySiteId }).returning();
-    return NextResponse.json(created, { status:201 });
+    await recordAuditEvent({ actorUserId: session.userId, action: "BENEFICIARY_CREATED", entityType: "beneficiary", entityId: created.id, afterValue: { beneficiaryCode: created.beneficiaryCode, provinceId: created.provinceId, districtId: created.districtId, deliverySiteId: created.deliverySiteId } });
+    return NextResponse.json(created, {status:201});
   } catch (error) { return apiError(error); }
 }
