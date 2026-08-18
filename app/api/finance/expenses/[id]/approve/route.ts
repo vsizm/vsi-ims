@@ -13,7 +13,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { id } = await params;
     const [expense] = await database().select().from(financeExpenses).where(eq(financeExpenses.id, id)).limit(1);
     if (!expense) return NextResponse.json({ error: "Expense not found." }, { status: 404 });
-    if (!["SUBMITTED", "DRAFT"].includes(expense.status)) return NextResponse.json({ error: "Only draft or submitted expenses can be approved." }, { status: 422 });
+    if (expense.status !== "SUBMITTED") return NextResponse.json({ error: "Only submitted expenses can be approved." }, { status: 422 });
     if (expense.submittedByUserId === session.userId) return NextResponse.json({ error: "A user cannot approve an expense they submitted." }, { status: 403 });
     const approvedAt = new Date();
     const [updated] = await database().update(financeExpenses).set({ status: "APPROVED", approvedByUserId: session.userId, approvedAt, updatedAt: approvedAt }).where(eq(financeExpenses.id, id)).returning();
