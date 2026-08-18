@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { results, targets } from "@/db/schema";
+import { results, targets, indicators } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { getRequestSession } from "@/lib/auth";
@@ -16,8 +16,15 @@ export async function POST(request: NextRequest) {
   const parsed=resultInput.safeParse(await request.json());
   if(!parsed.success)return NextResponse.json({error:"Invalid result",details:parsed.error.flatten()},{status:422});
   try{
-    const [target]=await database().select({id:targets.id}).from(targets).where(eq(targets.id,parsed.data.targetId)).limit(1);
+    if (parsed.data.periodStart > parsed.data.periodEnd) return NextResponse.json({error:"Reporting period start cannot be after period end."},{status:422});
+    const [target]=await database().select({id:targets.id,year:targets.year,indicatorId:targets.indicatorId}).from(targets).where(eq(targets.id,parsed.data.targetId)).limit(1);
     if(!target)return NextResponse.json({error:"Target not found."},{status:404});
+    const [indicator]=await database().select({id:indicators.id,active:indicators.active}).from(indicators).where(eq(indicators.id,target.indicatorId)).limit(1);
+    if(!indicator)return NextResponse.json({error:"Indicator not found."},{status:404});
+    if(!indicator.active)return NextResponse.json({error:"Cannot create a result for an inactive indicator."},{status:422});
+    const targetYearStart = `${target.year}-01-01`;
+    const targetYearEnd = `${target.year}-12-31`;
+    if (parsed.data.periodStart < targetYearStart || parsed.data.periodEnd > targetYearEnd) return NextResponse.json({error:"Reporting period must fall within the target year."},{status:422});
     const existing=await database().select({id:results.id}).from(results).where(and(eq(results.targetId,parsed.data.targetId),eq(results.periodStart,parsed.data.periodStart),eq(results.periodEnd,parsed.data.periodEnd))).limit(1);
     if(existing[0])return NextResponse.json({error:"A result already exists for this target and reporting period."},{status:409});
     const [created]=await database().insert(results).values({targetId:parsed.data.targetId,periodStart:parsed.data.periodStart,periodEnd:parsed.data.periodEnd,actualValue:String(parsed.data.actualValue),notes:parsed.data.notes}).returning();

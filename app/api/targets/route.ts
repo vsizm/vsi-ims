@@ -17,8 +17,9 @@ export async function POST(request: NextRequest) {
   const parsed=targetInput.safeParse(await request.json());
   if(!parsed.success)return NextResponse.json({error:"Invalid target",details:parsed.error.flatten()},{status:422});
   try{
-    const [indicator]=await database().select({id:indicators.id}).from(indicators).where(eq(indicators.id,parsed.data.indicatorId)).limit(1);
+    const [indicator]=await database().select({id:indicators.id,active:indicators.active}).from(indicators).where(eq(indicators.id,parsed.data.indicatorId)).limit(1);
     if(!indicator)return NextResponse.json({error:"Indicator not found."},{status:404});
+    if(!indicator.active)return NextResponse.json({error:"Cannot create a target for an inactive indicator."},{status:422});
     const provinceId=parsed.data.provinceId?await resolveProvinceId(parsed.data.provinceId):null;
     const districtId=parsed.data.districtId?await resolveDistrictId(parsed.data.districtId):null;
     if(parsed.data.provinceId&&!provinceId)return NextResponse.json({error:"Province not found."},{status:404});

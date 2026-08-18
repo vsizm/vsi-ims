@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const denied = requireServiceAccess(request, "budgets.manage");
+  const denied = requireServiceAccess(request, "management.actions.manage");
   if (denied) return denied;
   const session = getRequestSession(request);
   if (!session) return NextResponse.json({ error: "Authenticated session required" }, { status: 401 });
