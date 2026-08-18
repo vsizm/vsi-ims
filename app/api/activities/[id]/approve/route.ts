@@ -4,6 +4,7 @@ import { activities } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { getRequestSession } from "@/lib/auth";
+import { recordAuditEvent } from "@/lib/audit";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const denied = requireServiceAccess(request, "activities.approve");
@@ -24,6 +25,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       updatedAt: new Date(),
       rejectionReason: null
     }).where(eq(activities.id, id)).returning();
+
+    await recordAuditEvent({ actorUserId: session.userId, action: "ACTIVITY_APPROVED", entityType: "activity", entityId: id, beforeValue: { approvalStatus: activity.approvalStatus }, afterValue: { approvalStatus: updated.approvalStatus } });
     return NextResponse.json(updated);
   } catch (error) { return apiError(error); }
 }
