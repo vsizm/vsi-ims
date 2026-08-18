@@ -7,6 +7,6 @@ export function GET() {
     status: "ok",
     environment: process.env.VERCEL_ENV ?? "development",
     databaseConfigured: Boolean(process.env.DATABASE_URL),
-    apiKeyConfigured: Boolean(process.env.VSI_API_KEY),
+    apiKeyConfigured: Boolean(process.env.VSI_INTERNAL_API_KEY),
   });
 }
