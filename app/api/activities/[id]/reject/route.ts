@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { activities } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
+import { getRequestSession } from "@/lib/auth";
 import { activityRejectionInput } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
 
 export async function POST(
   request: NextRequest,
@@ -12,8 +14,9 @@ export async function POST(
   const denied = requireServiceAccess(request, "activities.approve");
   if (denied) return denied;
 
+  const session = getRequestSession(request);
+  if (!session) return NextResponse.json({ error: "Authenticated session required." }, { status: 401 });
   const { id } = await params;
-
   const parsed = activityRejectionInput.safeParse(await request.json());
 
   if (!parsed.success) {
@@ -30,15 +33,9 @@ export async function POST(
       .where(eq(activities.id, id))
       .limit(1);
 
-    if (!activity) {
-      return NextResponse.json({ error: "Activity not found." }, { status: 404 });
-    }
-
+    if (!activity) return NextResponse.json({ error: "Activity not found." }, { status: 404 });
     if (activity.approvalStatus !== "SUBMITTED") {
-      return NextResponse.json(
-        { error: "Only submitted activities can be rejected." },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "Only submitted activities can be rejected." }, { status: 409 });
     }
 
     const [updated] = await database()
@@ -53,6 +50,7 @@ export async function POST(
       .where(eq(activities.id, id))
       .returning();
 
+    await recordAuditEvent({ actorUserId: session.userId, action: "ACTIVITY_REJECTED", entityType: "activity", entityId: id, beforeValue: { approvalStatus: activity.approvalStatus }, afterValue: { approvalStatus: updated.approvalStatus, rejectionReason: parsed.data.reason } });
     return NextResponse.json(updated);
   } catch (error) {
     return apiError(error);
