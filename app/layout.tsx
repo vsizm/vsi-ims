@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Roboto } from "next/font/google";
 import "./globals.css";
 import "./ui-overrides.css";
+import "./management-cards.css";
 
 const roboto = Roboto({ subsets: ["latin"], display: "swap", variable: "--font-vsi" });
 
