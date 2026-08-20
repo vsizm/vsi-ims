@@ -1,0 +1,10 @@
+import { eq } from "drizzle-orm";
+import { NextRequest, NextResponse } from "next/server";
+import { programmes } from "@/db/schema";
+import { database } from "@/lib/db";
+import { apiError, requireServiceAccess } from "@/lib/api";
+import { getRequestSession } from "@/lib/auth";
+import { programmeInput } from "@/lib/validation";
+import { recordAuditEvent } from "@/lib/audit";
+export async function PATCH(request:NextRequest,{params}:{params:Promise<{id:string}>}){const denied=requireServiceAccess(request,"programmes.manage");if(denied)return denied;const s=getRequestSession(request);if(!s)return NextResponse.json({error:"Authenticated session required."},{status:401});try{const{id}=await params;const p=programmeInput.partial().safeParse(await request.json());if(!p.success)return NextResponse.json({error:"Invalid programme",details:p.error.flatten()},{status:422});const[before]=await database().select().from(programmes).where(eq(programmes.id,id)).limit(1);if(!before)return NextResponse.json({error:"Programme not found."},{status:404});const[updated]=await database().update(programmes).set({...p.data,updatedAt:new Date()}).where(eq(programmes.id,id)).returning();await recordAuditEvent({actorUserId:s.userId,action:"PROGRAMME_UPDATED",entityType:"programme",entityId:id,beforeValue:before,afterValue:updated});return NextResponse.json(updated);}catch(e){return apiError(e);}}
+export async function DELETE(request:NextRequest,{params}:{params:Promise<{id:string}>}){const denied=requireServiceAccess(request,"programmes.manage");if(denied)return denied;const s=getRequestSession(request);if(!s)return NextResponse.json({error:"Authenticated session required."},{status:401});try{const{id}=await params;const[before]=await database().select().from(programmes).where(eq(programmes.id,id)).limit(1);if(!before)return NextResponse.json({error:"Programme not found."},{status:404});await database().delete(programmes).where(eq(programmes.id,id));await recordAuditEvent({actorUserId:s.userId,action:"PROGRAMME_DELETED",entityType:"programme",entityId:id,beforeValue:before});return NextResponse.json({ok:true});}catch(e){return apiError(e);}}
