@@ -1,6 +1,6 @@
 import { and, desc, eq } from "drizzle-orm";
 import { NextRequest, NextResponse } from "next/server";
-import { results, targets } from "@/db/schema";
+import { results, targets, indicators } from "@/db/schema";
 import { database } from "@/lib/db";
 import { apiError, requireServiceAccess } from "@/lib/api";
 import { getRequestSession } from "@/lib/auth";
@@ -17,8 +17,11 @@ export async function POST(request: NextRequest) {
   if(!parsed.success)return NextResponse.json({error:"Invalid result",details:parsed.error.flatten()},{status:422});
   try{
     if (parsed.data.periodStart > parsed.data.periodEnd) return NextResponse.json({error:"Reporting period start cannot be after period end."},{status:422});
-    const [target]=await database().select({id:targets.id,year:targets.year}).from(targets).where(eq(targets.id,parsed.data.targetId)).limit(1);
+    const [target]=await database().select({id:targets.id,year:targets.year,indicatorId:targets.indicatorId}).from(targets).where(eq(targets.id,parsed.data.targetId)).limit(1);
     if(!target)return NextResponse.json({error:"Target not found."},{status:404});
+    const [indicator]=await database().select({id:indicators.id,active:indicators.active}).from(indicators).where(eq(indicators.id,target.indicatorId)).limit(1);
+    if(!indicator)return NextResponse.json({error:"Indicator not found."},{status:404});
+    if(!indicator.active)return NextResponse.json({error:"Cannot create a result for an inactive indicator."},{status:422});
     const targetYearStart = `${target.year}-01-01`;
     const targetYearEnd = `${target.year}-12-31`;
     if (parsed.data.periodStart < targetYearStart || parsed.data.periodEnd > targetYearEnd) return NextResponse.json({error:"Reporting period must fall within the target year."},{status:422});
