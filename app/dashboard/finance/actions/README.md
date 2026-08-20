@@ -1,1 +1,0 @@
-V1 UI workflow actions are wired directly into hierarchy pages. This placeholder documents the intentional V1 boundary: allocation approval is performed from the owning hierarchy card; no separate finance workflow page is required.
