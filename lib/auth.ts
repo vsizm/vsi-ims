@@ -85,5 +85,22 @@ export async function getSession() {
 }
 
 export function configuredAuth() {
-  return Boolean(process.env.VSI_AUTH_EMAIL && process.env.VSI_AUTH_PASSWORD_HASH && process.env.VSI_AUTH_USER_ID && process.env.VSI_AUTH_ROLE && process.env.VSI_SESSION_SECRET);
+  const administratorConfigured = Boolean(
+    process.env.VSI_AUTH_EMAIL &&
+    process.env.VSI_AUTH_PASSWORD_HASH &&
+    process.env.VSI_AUTH_USER_ID &&
+    process.env.VSI_AUTH_ROLE
+  );
+
+  const programmeManagerConfigured = Boolean(
+    process.env.VSI_PM_AUTH_EMAIL &&
+    process.env.VSI_PM_AUTH_PASSWORD_HASH &&
+    process.env.VSI_PM_AUTH_USER_ID &&
+    process.env.VSI_PM_AUTH_ROLE
+  );
+
+  return Boolean(
+    process.env.VSI_SESSION_SECRET &&
+    (administratorConfigured || programmeManagerConfigured)
+  );
 }

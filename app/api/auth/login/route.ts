@@ -2,32 +2,86 @@ import { NextRequest, NextResponse } from "next/server";
 import { createSession, setSessionCookie, verifyPassword } from "@/lib/auth";
 import { roles, type Role } from "@/lib/roles";
 
+type AuthAccount = {
+  email: string;
+  passwordHash: string;
+  userId: string;
+  role: Role;
+};
+
 export async function POST(request: NextRequest) {
-  const email = process.env.VSI_AUTH_EMAIL;
-  const passwordHash = process.env.VSI_AUTH_PASSWORD_HASH;
-  const userId = process.env.VSI_AUTH_USER_ID;
-  const role = process.env.VSI_AUTH_ROLE as Role | undefined;
+  const accounts: AuthAccount[] = [
+    {
+      email: process.env.VSI_AUTH_EMAIL ?? "",
+      passwordHash: process.env.VSI_AUTH_PASSWORD_HASH ?? "",
+      userId: process.env.VSI_AUTH_USER_ID ?? "",
+      role: process.env.VSI_AUTH_ROLE as Role,
+    },
+    {
+      email: process.env.VSI_PM_AUTH_EMAIL ?? "",
+      passwordHash: process.env.VSI_PM_AUTH_PASSWORD_HASH ?? "",
+      userId: process.env.VSI_PM_AUTH_USER_ID ?? "",
+      role: process.env.VSI_PM_AUTH_ROLE as Role,
+    },
+  ];
 
-  if (!email || !passwordHash || !userId || !role || !process.env.VSI_SESSION_SECRET) {
-    return NextResponse.json({ error: "Authentication is not configured." }, { status: 503 });
-  }
+  const configuredAccounts = accounts.filter(
+    (account) =>
+      account.email &&
+      account.passwordHash &&
+      account.userId &&
+      account.role &&
+      roles.includes(account.role)
+  );
 
-  if (!roles.includes(role)) {
-    return NextResponse.json({ error: "Authentication configuration is invalid." }, { status: 503 });
+  if (!process.env.VSI_SESSION_SECRET || configuredAccounts.length === 0) {
+    return NextResponse.json(
+      { error: "Authentication is not configured." },
+      { status: 503 }
+    );
   }
 
   let body: { email?: string; password?: string };
+
   try {
     body = await request.json();
   } catch {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid request." },
+      { status: 400 }
+    );
   }
 
-  if (!body.email || !body.password) return NextResponse.json({ error: "Email and password are required." }, { status: 400 });
+  if (!body.email || !body.password) {
+    return NextResponse.json(
+      { error: "Email and password are required." },
+      { status: 400 }
+    );
+  }
 
-  const valid = body.email.trim().toLowerCase() === email.trim().toLowerCase() && verifyPassword(body.password, passwordHash);
-  if (!valid) return NextResponse.json({ error: "Invalid credentials." }, { status: 401 });
+  const email = body.email.trim().toLowerCase();
 
-  await setSessionCookie(createSession({ userId, role, email: email.trim().toLowerCase() }));
-  return NextResponse.json({ authenticated: true, role });
+  const account = configuredAccounts.find(
+    (item) => item.email.trim().toLowerCase() === email
+  );
+
+  if (!account || !verifyPassword(body.password, account.passwordHash)) {
+    return NextResponse.json(
+      { error: "Invalid credentials." },
+      { status: 401 }
+    );
+  }
+
+  await setSessionCookie(
+    createSession({
+      userId: account.userId,
+      role: account.role,
+      email: account.email.trim().toLowerCase(),
+    })
+  );
+
+  return NextResponse.json({
+    authenticated: true,
+    role: account.role,
+  });
 }

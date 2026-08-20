@@ -91,11 +91,13 @@ export async function PATCH(
     }
 
     const indicatorId = parsed.data.indicatorId ?? existing.indicatorId;
-    const provinceId =
+
+    let provinceId =
       parsed.data.provinceId !== undefined
         ? parsed.data.provinceId
         : existing.provinceId;
-    const districtId =
+
+    let districtId =
       parsed.data.districtId !== undefined
         ? parsed.data.districtId
         : existing.districtId;
@@ -114,36 +116,65 @@ export async function PATCH(
     }
 
     if (provinceId) {
-      const [province] = await database()
+      const [provinceByCode] = await database()
         .select({ id: provinces.id })
         .from(provinces)
-        .where(eq(provinces.id, provinceId))
+        .where(eq(provinces.code, provinceId))
         .limit(1);
 
-      if (!province) {
-        return NextResponse.json(
-          { error: "Province not found." },
-          { status: 404 }
-        );
+      if (provinceByCode) {
+        provinceId = provinceByCode.id;
+      } else {
+        const [provinceById] = await database()
+          .select({ id: provinces.id })
+          .from(provinces)
+          .where(eq(provinces.id, provinceId))
+          .limit(1);
+
+        if (!provinceById) {
+          return NextResponse.json(
+            { error: `Province not found: ${provinceId}` },
+            { status: 404 }
+          );
+        }
+
+        provinceId = provinceById.id;
       }
     }
 
     if (districtId) {
-      const [district] = await database()
+      const [districtByCode] = await database()
         .select({
           id: districts.id,
           provinceId: districts.provinceId
         })
         .from(districts)
-        .where(eq(districts.id, districtId))
+        .where(eq(districts.code, districtId))
         .limit(1);
+
+      let district = districtByCode;
+
+      if (!district) {
+        const [districtById] = await database()
+          .select({
+            id: districts.id,
+            provinceId: districts.provinceId
+          })
+          .from(districts)
+          .where(eq(districts.id, districtId))
+          .limit(1);
+
+        district = districtById;
+      }
 
       if (!district) {
         return NextResponse.json(
-          { error: "District not found." },
+          { error: `District not found: ${districtId}` },
           { status: 404 }
         );
       }
+
+      districtId = district.id;
 
       if (provinceId && district.provinceId !== provinceId) {
         return NextResponse.json(
@@ -153,12 +184,15 @@ export async function PATCH(
       }
     }
 
-    const { targetValue, ...updateData } = parsed.data;
+    const { targetValue, provinceId: _provinceId, districtId: _districtId, ...updateData } =
+      parsed.data;
 
     const [updated] = await database()
       .update(targets)
       .set({
         ...updateData,
+        provinceId,
+        districtId,
         ...(targetValue !== undefined
           ? { targetValue: targetValue.toString() }
           : {}),

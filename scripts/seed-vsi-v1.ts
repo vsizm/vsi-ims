@@ -1,3 +1,5 @@
+import dotenv from "dotenv"; dotenv.config({ path: ".env.local" });
+async function main() {
 const BASE = process.env.VSI_SEED_BASE_URL ?? "http://localhost:3000/api";
 const EMAIL = process.env.VSI_AUTH_EMAIL;
 const PASSWORD = process.env.VSI_SEED_PASSWORD;
@@ -178,10 +180,159 @@ for (const programme of programmes) {
   }
 }
 
+
+// ===== V1 DIRECT-BENEFICIARY TARGET BASELINE =====
+
+const directBeneficiaryTargets = [
+  ["CEV-VMP", "CEV-VMP-DIRBEN", "Direct beneficiaries reached through Volunteer Management", 5000],
+  ["CEV-CSVP", "CEV-CSVP-DIRBEN", "Direct beneficiaries reached through Community Service and Volunteerism", 15000],
+  ["EIE-AAP", "EIE-AAP-DIRBEN", "Direct beneficiaries reached through Agriculture and Agro-processing", 8000],
+  ["EIE-TIEP", "EIE-TIEP-DIRBEN", "Direct beneficiaries reached through Technology and Innovation Entrepreneurship", 7000],
+  ["MHSW-MHRP", "MHSW-MHRP-DIRBEN", "Direct beneficiaries reached through Mental Health Resilience", 12000],
+  ["MHSW-SPP", "MHSW-SPP-DIRBEN", "Direct beneficiaries reached through Suicide Prevention", 8000],
+  ["CASD-KZCGH", "CASD-KZCGH-DIRBEN", "Direct beneficiaries reached through Keep Zambia Clean, Green and Healthy", 15000],
+  ["CLDG-NVPA", "CLDG-NVPA-DIRBEN", "Direct beneficiaries reached through National Values and Principles Awareness", 15000],
+  ["CLDG-VEP", "CLDG-VEP-DIRBEN", "Direct beneficiaries reached through Voter Education", 15000],
+] as const;
+
+const indicators = await api("/indicators") as Array<{
+  id: string;
+  projectId: string;
+  code: string;
+}>;
+
+const indicatorByCode = new Map(
+  indicators.map((indicator) => [indicator.code, indicator])
+);
+
+const projectsForTargets = await api("/projects") as Array<{
+  id: string;
+  code: string;
+}>;
+
+const projectByCode = new Map(
+  projectsForTargets.map((project) => [project.code, project])
+);
+
+for (const [projectCode, indicatorCode, indicatorName, targetValue] of directBeneficiaryTargets) {
+  const project = projectByCode.get(projectCode);
+
+  if (!project) {
+    throw new Error(`Cannot seed target: project ${projectCode} not found.`);
+  }
+
+  let indicator = indicatorByCode.get(indicatorCode);
+
+  if (!indicator) {
+    indicator = await api("/indicators", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        projectId: project.id,
+        code: indicatorCode,
+        name: indicatorName,
+        description: `V1 direct-beneficiary baseline indicator for ${projectCode}.`,
+        level: "OUTPUT",
+        unit: "COUNT",
+      }),
+    });
+
+    indicatorByCode.set(indicatorCode, indicator!);
+    console.log(`  CREATED INDICATOR: ${indicatorCode}`);
+  } else {
+    console.log(`  EXISTS INDICATOR: ${indicatorCode}`);
+  }
+}
+
+const existingTargets = await api("/targets") as Array<{
+  id: string;
+  indicatorId: string;
+  year: number;
+}>;
+
+for (const [projectCode, indicatorCode, , targetValue] of directBeneficiaryTargets) {
+  const indicator = indicatorByCode.get(indicatorCode);
+
+  if (!indicator) {
+    throw new Error(`Indicator ${indicatorCode} was not created/found.`);
+  }
+
+  const alreadyExists = existingTargets.some(
+    (target) =>
+      target.indicatorId === indicator.id &&
+      target.year === 2030
+  );
+
+  if (alreadyExists) {
+    console.log(`  EXISTS TARGET: ${indicatorCode} / 2030`);
+    continue;
+  }
+
+  await api("/targets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      indicatorId: indicator.id,
+      year: 2030,
+      targetValue,
+      notes: `V1 baseline allocation. Project allocation target: ${targetValue.toLocaleString()} direct beneficiaries.`,
+    }),
+  });
+
+  console.log(
+    `  CREATED TARGET: ${projectCode} / 2030 / ${targetValue.toLocaleString()}`
+  );
+}
+
+console.log("\n===== V1 DIRECT-BENEFICIARY BASELINE =====");
+
+const finalIndicators = await api("/indicators") as Array<{
+  id: string;
+  projectCode: string;
+  code: string;
+}>;
+
+const finalTargets = await api("/targets") as Array<{
+  indicatorId: string;
+  year: number;
+  targetValue: string | number;
+  indicatorCode: string;
+}>;
+
+const baselineIndicatorCodes = new Set<string>(
+  directBeneficiaryTargets.map(([, indicatorCode]) => indicatorCode)
+);
+
+const baselineTargets = finalTargets.filter(
+  (target) =>
+    target.year === 2030 &&
+    baselineIndicatorCodes.has(target.indicatorCode)
+);
+
+const baselineTotal = baselineTargets.reduce(
+  (sum, target) => sum + Number(target.targetValue),
+  0
+);
+
+console.log(`INDICATORS: ${finalIndicators.filter((i) => baselineIndicatorCodes.has(i.code)).length}`);
+console.log(`TARGETS: ${baselineTargets.length}`);
+console.log(`TOTAL: ${baselineTotal.toLocaleString()}`);
+
+if (baselineTotal !== 100000) {
+  throw new Error(
+    `V1 baseline total is ${baselineTotal.toLocaleString()}, expected 100,000.`
+  );
+}
+
 console.log("\n===== PROGRAMMES =====");
 console.log(JSON.stringify(await api("/programmes"), null, 2));
 
 console.log("\n===== PROJECTS =====");
 console.log(JSON.stringify(await api("/projects"), null, 2));
 
-export {};
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

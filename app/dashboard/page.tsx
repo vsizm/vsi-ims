@@ -1,4 +1,5 @@
 import Link from "next/link";
+import LogoutButton from "@/components/auth/logout-button";
 import { count, desc, eq } from "drizzle-orm";
 import { activities, programmes, projects, reports } from "@/db/schema";
 import { database } from "@/lib/db";
@@ -75,7 +76,7 @@ export default async function Dashboard() {
         <div className="sidebar-divider" /><div className="workspace-label">SYSTEM</div>
         <div className="sidebar-link muted-link"><Icon>◉</Icon><span>Health</span><b className="online-dot">●</b></div>
         <div className="sidebar-link muted-link"><Icon>⚙</Icon><span>Configuration</span></div>
-        <div className="sidebar-bottom"><div className="user-card"><div className="avatar">PA</div><div><strong>Programme Admin</strong><span>VSI Foundation</span></div><span className="user-menu">⋮</span></div></div>
+        <div className="sidebar-bottom"><div className="user-card"><div className="avatar">PA</div><div><strong>Programme Admin</strong><span>VSI Foundation</span></div><LogoutButton /></div></div>
       </aside>
 
       <section className="workspace">
