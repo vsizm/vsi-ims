@@ -25,9 +25,11 @@ export async function PATCH(request: NextRequest) {
   if (!id) return NextResponse.json({ error: "Volunteer id is required." }, { status: 400 });
   const parsed = volunteerInput.partial().safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Invalid volunteer update", details: parsed.error.flatten() }, { status: 422 });
-  try {
-    const [updated] = await database().update(volunteers).set({ ...parsed.data, updatedAt: new Date() }).where(eq(volunteers.id, id)).returning();
-    if (!updated) return NextResponse.json({ error: "Volunteer not found." }, { status: 404 });
-    return NextResponse.json(updated);
-  } catch (error) { return apiError(error); }
+  try { const [updated] = await database().update(volunteers).set({ ...parsed.data, updatedAt: new Date() }).where(eq(volunteers.id, id)).returning(); if (!updated) return NextResponse.json({ error: "Volunteer not found." }, { status: 404 }); return NextResponse.json(updated); } catch (error) { return apiError(error); }
+}
+
+export async function DELETE(request: NextRequest) {
+  const denied = requireServiceAccess(request, "volunteers.manage"); if (denied) return denied;
+  const id = request.nextUrl.searchParams.get("id"); if (!id) return NextResponse.json({ error: "Volunteer id is required." }, { status: 400 });
+  try { const [existing] = await database().select({ id: volunteers.id, status: volunteers.status }).from(volunteers).where(eq(volunteers.id, id)).limit(1); if (!existing) return NextResponse.json({ error: "Volunteer not found." }, { status: 404 }); if (existing.status === "ACTIVE") return NextResponse.json({ error: "Active volunteers cannot be deleted. Mark the record INACTIVE or ALUMNI instead." }, { status: 422 }); await database().delete(volunteers).where(eq(volunteers.id, id)); return NextResponse.json({ ok: true }); } catch (error) { return apiError(error); }
 }
