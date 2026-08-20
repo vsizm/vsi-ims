@@ -5,7 +5,7 @@ import { database } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 const BENEFICIARY_TARGET = 100_000;
-const navItems = [["Dashboard","⌂","/dashboard"],["Programmes","▣","/dashboard/programmes"],["Projects","◫","/dashboard/projects"],["Activities","✓","/dashboard/activities"],["Reports","▤","/dashboard/reports"],["Financial Intelligence","₭","/dashboard/finance"],["Volunteer Management","♙","/dashboard/volunteers"]];
+const navItems = [["Dashboard","⌂","/dashboard"],["Directorates","▥","/dashboard/directorates"],["Programmes","▣","/dashboard/programmes"],["Projects","◫","/dashboard/projects"],["Activities","✓","/dashboard/activities"],["Reports","▤","/dashboard/reports"],["Financial Intelligence","₭","/dashboard/finance"],["Volunteer Management","♙","/dashboard/volunteers"]];
 function Icon({ children }: { children: React.ReactNode }) { return <span className="nav-icon" aria-hidden="true">{children}</span>; }
 function formatDate(value: Date | string | null) { if (!value) return "—"; return new Intl.DateTimeFormat("en-GB", { day: "2-digit", month: "short", year: "numeric" }).format(new Date(value)); }
 
