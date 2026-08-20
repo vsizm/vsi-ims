@@ -1,0 +1,1 @@
+Current staging branch carries the Directorate annual budget save fix on a clean branch derived from staging. Vercel checks may remain blocked by the Hobby deployment quota; GitHub Vercel bot previously reported api-deployments-free-per-day.
