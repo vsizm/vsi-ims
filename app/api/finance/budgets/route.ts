@@ -11,7 +11,14 @@ const budgetInput = z.object({
   level: z.enum(["DIRECTORATE", "PROGRAMME", "PROJECT", "ACTIVITY"]).default("PROJECT"), directorateId: z.string().uuid().optional(), programmeId: z.string().uuid().optional(), projectId: z.string().uuid().optional(), activityId: z.string().uuid().optional(), parentBudgetId: z.string().uuid().optional(), financialYear: z.coerce.number().int().min(2020).max(2100), budgetCode: z.string().trim().min(2).max(64), amountZmw: z.coerce.number().positive().max(99999999999999.99), notes: z.string().trim().max(4000).optional(),
 });
 const scopeByLevel = { DIRECTORATE: "directorateId", PROGRAMME: "programmeId", PROJECT: "projectId", ACTIVITY: "activityId" } as const;
-export async function GET(request: NextRequest) { const denied=requireServiceAccess(request,"budgets.read"); if(denied)return denied; try{return NextResponse.json(await database().select().from(financeBudgets).orderBy(desc(financeBudgets.financialYear),desc(financeBudgets.createdAt)));}catch(error){return apiError(error);} }
+function budgetDbError(error: unknown) {
+  const code = typeof error === "object" && error !== null && "code" in error ? String((error as { code?: unknown }).code) : "";
+  if (code === "23505") return NextResponse.json({ error: "Budget code already exists. Enter a unique budget code." }, { status: 409 });
+  if (code === "23514") return NextResponse.json({ error: "The budget does not satisfy the required budget hierarchy." }, { status: 422 });
+  if (code === "23503") return NextResponse.json({ error: "A referenced Directorate, Programme, Project or Activity could not be found." }, { status: 422 });
+  return apiError(error);
+}
+export async function GET(request: NextRequest) { const denied=requireServiceAccess(request,"budgets.read"); if(denied)return denied; try{return NextResponse.json(await database().select().from(financeBudgets).orderBy(desc(financeBudgets.financialYear),desc(financeBudgets.createdAt)));}catch(error){return budgetDbError(error);} }
 export async function POST(request: NextRequest) {
   const denied=requireServiceAccess(request,"budgets.manage"); if(denied)return denied;
   const session=getRequestSession(request); if(!session)return NextResponse.json({error:"Authenticated session required."},{status:401});
@@ -32,5 +39,5 @@ export async function POST(request: NextRequest) {
     const [created]=await db.insert(financeBudgets).values(values).returning();
     await recordAuditEvent({actorUserId:session.userId,action:"FINANCE_BUDGET_CREATED",entityType:"finance_budget",entityId:created.id,afterValue:{level:created.level,financialYear:created.financialYear,budgetCode:created.budgetCode,amountZmw:created.amountZmw,parentBudgetId:created.parentBudgetId,createdByUserId:created.createdByUserId}});
     return NextResponse.json(created,{status:201});
-  }catch(error){return apiError(error);}
+  }catch(error){return budgetDbError(error);}
 }
