@@ -16,30 +16,32 @@ if (!process.env.DATABASE_URL) {
 
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 
-// These are deliberately broad functional directorates so the V1 hierarchy has
-// an explicit organisational parent without inventing project-level ownership.
-// Existing directorates with the same codes are updated idempotently.
+// VSI's IMS operating model is intentionally lean. Programmes and CPRM are
+// the primary organisational engines; MEAL, Finance/Admin, Policy/Advocacy,
+// Legal/Compliance and Operations are enabling/support functions.
 const directorates = [
-  ["CEV", "Community Engagement & Volunteerism", "Community engagement, volunteerism and community-facing delivery."],
-  ["EIE", "Enterprise, Innovation & Employability", "Entrepreneurship, innovation, employability and enterprise development."],
-  ["MHSW", "Mental Health & Student Wellbeing", "Mental health, wellbeing and student support programmes."],
-  ["GOV", "Governance, Policy & Advocacy", "Civic leadership, voter education, policy, advocacy and research."],
-  ["CPRM", "Communications, Partnerships & Resource Mobilisation", "Communications, partnerships, fundraising, donor relations and knowledge mobilisation."],
-  ["CASD", "Climate Action & Sustainable Development", "Climate action, environmental protection and sustainable development."],
+  ["PROG", "Directorate of Programmes", "Primary programme, project and activity delivery."],
+  ["CPRM", "Directorate of Communications, Partnerships & Resource Mobilisation", "Strategic communications, partnerships, fundraising, donor relations and resource mobilisation."],
+  ["PAR", "Directorate of Policy, Advocacy & Research", "Policy, advocacy, research, evidence and institutional influence."],
+  ["MEAL", "Directorate of Monitoring, Evaluation, Accountability & Learning", "Performance measurement, learning, accountability, reporting and evidence."],
+  ["FIN_ADMIN", "Directorate of Finance & Administration", "Financial management, administration, controls and organisational support."],
+  ["LEGAL_COMP", "Directorate of Legal & Compliance", "Legal, regulatory, governance and compliance support."],
+  ["OPS", "Directorate of Operations & Field Delivery", "Operational coordination, logistics and field implementation support."],
 ];
 
-// Programme -> Directorate mapping. Existing programme names/codes remain
-// authoritative; this repair only establishes the missing parent relationship.
+// Existing programme codes remain authoritative. This repair only changes
+// their organisational parent and deactivates legacy thematic directorates;
+// it does not delete records or alter programme/project/activity ownership.
 const programmeDirectorate = {
-  CEV: "CEV",
-  EIE: "EIE",
-  MHSW: "MHSW",
-  CLDG: "GOV",
-  PAR: "GOV",
-  E2E: "GOV",
-  "E2E-2026": "GOV",
-  VE26: "GOV",
-  CASD: "CASD",
+  CEV: "PROG",
+  EIE: "PROG",
+  MHSW: "PROG",
+  CASD: "PROG",
+  CLDG: "PAR",
+  PAR: "PAR",
+  VE26: "PAR",
+  E2E: "PAR",
+  "E2E-2026": "PAR",
   CPRM: "CPRM",
 };
 
@@ -71,17 +73,26 @@ try {
         WHERE code = ${programmeCode} AND active = true
       `;
     }
+
+    // Preserve legacy data for audit/history, but remove it from the active
+    // organisational structure shown to users.
+    await tx`
+      UPDATE directorates
+      SET active = false, updated_at = now()
+      WHERE active = true
+        AND code NOT IN (${sql.unsafe(directorates.map(([code]) => `'${code}'`).join(","))})
+    `;
   });
 
-  const [programmes] = await Promise.all([
+  const [orphans] = await Promise.all([
     sql`SELECT code FROM programmes WHERE active = true AND directorate_id IS NULL ORDER BY code`,
   ]);
 
-  if (programmes.length) {
-    throw new Error(`Repair incomplete; unassigned active programmes: ${programmes.map((row) => row.code).join(", ")}`);
+  if (orphans.length) {
+    throw new Error(`Repair incomplete; unassigned active programmes: ${orphans.map((row) => row.code).join(", ")}`);
   }
 
-  console.log("V1 hierarchy repair complete: every active programme now has a Directorate parent.");
+  console.log("VSI V1 hierarchy repair complete: active structure is limited to the agreed seven functional Directorates.");
 } finally {
   await sql.end({ timeout: 5 });
 }
