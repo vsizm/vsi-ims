@@ -51,7 +51,7 @@ try {
       (level = 'DIRECTORATE' AND (directorate_id IS NULL OR programme_id IS NOT NULL OR project_id IS NOT NULL OR activity_id IS NOT NULL))
       OR (level = 'PROGRAMME' AND (programme_id IS NULL OR directorate_id IS NOT NULL OR project_id IS NOT NULL OR activity_id IS NOT NULL))
       OR (level = 'PROJECT' AND (project_id IS NULL OR directorate_id IS NOT NULL OR programme_id IS NOT NULL OR activity_id IS NOT NULL))
-      OR (level = 'ACTIVITY' AND (activity_id IS NULL OR directorate_id IS NOT NULL OR programme_id IS NOT NULL OR project_id IS NOT NULL)
+      OR (level = 'ACTIVITY' AND (activity_id IS NULL OR directorate_id IS NOT NULL OR programme_id IS NOT NULL OR project_id IS NOT NULL))
       ORDER BY budget_code`,
   ]);
 
