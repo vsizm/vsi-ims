@@ -1,4 +1,25 @@
+import { existsSync } from "node:fs";
+import { loadEnvFile } from "node:process";
 import postgres from "postgres";
+
+// Keep the validator runnable from Codespaces/local shells where DATABASE_URL
+// lives in the project's local env file rather than the exported shell.
+if (!process.env.DATABASE_URL) {
+  for (const file of [".env.local", ".env"]) {
+    if (!existsSync(file)) continue;
+    try {
+      loadEnvFile(file);
+    } catch {
+      // Continue to the next env source; the explicit check below gives the
+      // actionable error if DATABASE_URL is still unavailable.
+    }
+    if (process.env.DATABASE_URL) break;
+  }
+}
+
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL is required (set it in the shell, .env.local, or .env)");
+}
 
 const sql = postgres(process.env.DATABASE_URL, { prepare: false });
 const failures = [];
@@ -9,8 +30,6 @@ function fail(message) {
 }
 
 try {
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-
   const [orphanProgrammes] = await Promise.all([
     sql`SELECT code, name FROM programmes WHERE active = true AND directorate_id IS NULL ORDER BY code`,
   ]);
@@ -32,7 +51,7 @@ try {
       (level = 'DIRECTORATE' AND (directorate_id IS NULL OR programme_id IS NOT NULL OR project_id IS NOT NULL OR activity_id IS NOT NULL))
       OR (level = 'PROGRAMME' AND (programme_id IS NULL OR directorate_id IS NOT NULL OR project_id IS NOT NULL OR activity_id IS NOT NULL))
       OR (level = 'PROJECT' AND (project_id IS NULL OR directorate_id IS NOT NULL OR programme_id IS NOT NULL OR activity_id IS NOT NULL))
-      OR (level = 'ACTIVITY' AND (activity_id IS NULL OR directorate_id IS NOT NULL OR programme_id IS NOT NULL OR project_id IS NOT NULL))
+      OR (level = 'ACTIVITY' AND (activity_id IS NULL OR directorate_id IS NOT NULL OR programme_id IS NOT NULL OR project_id IS NOT NULL)
       ORDER BY budget_code`,
   ]);
 
@@ -52,7 +71,7 @@ try {
   console.log(`Checked ${orphanProgrammes.length} Directorate-orphaned programmes, ${orphanProjects.length} hierarchy-orphaned projects, and ${invalidBudgets.length} invalid budget scopes.`);
 
   if (failures.length) {
-    console.error(`\\nV1 integrity validation failed with ${failures.length} issue(s).`);
+    console.error(`\nV1 integrity validation failed with ${failures.length} issue(s).`);
     process.exitCode = 1;
   } else {
     console.log("V1 integrity validation passed.");
