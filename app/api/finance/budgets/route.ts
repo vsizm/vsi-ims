@@ -14,6 +14,7 @@ const budgetInput = z.object({
   financialYear: z.coerce.number().int().min(2020).max(2100), budgetCode: z.string().trim().min(2).max(64), amountZmw: z.coerce.number().positive().max(99999999999999.99), notes: z.string().trim().max(4000).optional(),
 });
 const scopeByLevel = { DIRECTORATE: "directorateId", PROGRAMME: "programmeId", PROJECT: "projectId", ACTIVITY: "activityId" } as const;
+const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 function dbErrorCode(error: unknown) { if (typeof error !== "object" || error === null) return ""; const value = error as { code?: unknown; cause?: { code?: unknown } }; return String(value.code ?? value.cause?.code ?? ""); }
 function dbErrorConstraint(error: unknown) { if (typeof error !== "object" || error === null) return ""; const value = error as { constraint?: unknown; cause?: { constraint?: unknown } }; return String(value.constraint ?? value.cause?.constraint ?? ""); }
 function budgetDbError(error: unknown) {
@@ -22,7 +23,7 @@ function budgetDbError(error: unknown) {
   if (code === "23514") return NextResponse.json({ error: "The budget does not satisfy the required budget hierarchy." }, { status: 422 });
   if (code === "23503") return NextResponse.json({ error: "A referenced Directorate, Programme, Project or Activity could not be found." }, { status: 422 });
   if (code === "23502") return NextResponse.json({ error: "A required budget field is missing. Please refresh and try again." }, { status: 422 });
-  if (code === "22P02") return NextResponse.json({ error: "The selected Directorate reference is no longer valid. Refresh the list and try again." }, { status: 422 });
+  if (code === "22P02") return NextResponse.json({ error: "The selected Directorate reference is invalid. Please refresh the Directorate list and try again." }, { status: 422 });
   if (code === "42703" || code === "42P01") return NextResponse.json({ error: "The finance database is missing a required V1 budget field or table. Apply the latest staging database migrations." }, { status: 500 });
   if (code === "42804") return NextResponse.json({ error: "The finance database schema does not match the current V1 budget model. Apply the latest staging database migrations." }, { status: 500 });
   return apiError(error);
@@ -36,8 +37,17 @@ export async function POST(request: NextRequest) {
   if (data.level !== "DIRECTORATE" && data.directorateCode) return NextResponse.json({ error: "directorateCode is only valid for Directorate budgets." }, { status: 422 });
   if (data.level === "DIRECTORATE" && !data.directorateId && !data.directorateCode) return NextResponse.json({ error: "A Directorate is required for Directorate budgets." }, { status: 422 });
   try {
-    const db = database(); let directorateId = data.directorateId;
-    if (data.level === "DIRECTORATE" && data.directorateCode) { const [byCode] = await db.select({ id: directorates.id }).from(directorates).where(eq(directorates.code, data.directorateCode)).limit(1); if (byCode) directorateId = byCode.id; }
+    const db = database();
+    let directorateId: string | undefined;
+    if (data.level === "DIRECTORATE" && data.directorateCode) {
+      const code = data.directorateCode.toUpperCase();
+      const [byCode] = await db.select({ id: directorates.id }).from(directorates).where(and(eq(directorates.code, code), eq(directorates.active, true))).limit(1);
+      if (!byCode) return NextResponse.json({ error: `Active Directorate ${code} was not found. Refresh the Directorate list and try again.` }, { status: 404 });
+      directorateId = byCode.id;
+    } else if (data.level === "DIRECTORATE" && data.directorateId) {
+      if (!uuidPattern.test(data.directorateId)) return NextResponse.json({ error: "The selected Directorate reference is invalid. Refresh the Directorate list and try again." }, { status: 422 });
+      directorateId = data.directorateId;
+    }
     if (data.level === "DIRECTORATE" && !directorateId) return NextResponse.json({ error: "Directorate not found. Refresh the Directorate list and try again." }, { status: 404 });
     const scopeKey = data.level === "DIRECTORATE" ? "directorateId" : scopeByLevel[data.level];
     const scopeValues = { ...data, directorateId };
@@ -48,7 +58,7 @@ export async function POST(request: NextRequest) {
     const [sameCode] = await db.select({ id: financeBudgets.id }).from(financeBudgets).where(eq(financeBudgets.budgetCode, data.budgetCode)).limit(1);
     if (sameCode) return NextResponse.json({ error: "Budget code already exists. Enter a unique budget code." }, { status: 409 });
     let entityDirectorateId: string | null = null, entityProgrammeId: string | null = null, entityProjectId: string | null = null;
-    if (data.level === "DIRECTORATE") { const [entity] = await db.select({ id: directorates.id }).from(directorates).where(eq(directorates.id, directorateId!)).limit(1); if (!entity) return NextResponse.json({ error: "Directorate not found. Refresh the Directorate list and try again." }, { status: 404 }); const [existingYear] = await db.select({ id: financeBudgets.id }).from(financeBudgets).where(and(eq(financeBudgets.directorateId, directorateId!), eq(financeBudgets.financialYear, data.financialYear), eq(financeBudgets.level, "DIRECTORATE"))).limit(1); if (existingYear) return NextResponse.json({ error: "A Directorate budget already exists for this financial year. Use the existing allocation instead of creating a duplicate." }, { status: 409 }); }
+    if (data.level === "DIRECTORATE") { const [entity] = await db.select({ id: directorates.id }).from(directorates).where(and(eq(directorates.id, directorateId!), eq(directorates.active, true))).limit(1); if (!entity) return NextResponse.json({ error: "Directorate not found. Refresh the Directorate list and try again." }, { status: 404 }); const [existingYear] = await db.select({ id: financeBudgets.id }).from(financeBudgets).where(and(eq(financeBudgets.directorateId, directorateId!), eq(financeBudgets.financialYear, data.financialYear), eq(financeBudgets.level, "DIRECTORATE"))).limit(1); if (existingYear) return NextResponse.json({ error: "A Directorate budget already exists for this financial year. Use the existing allocation instead of creating a duplicate." }, { status: 409 }); }
     if (data.level === "PROGRAMME") { const [entity] = await db.select({ id: programmes.id, directorateId: programmes.directorateId }).from(programmes).where(eq(programmes.id, data.programmeId!)).limit(1); if (!entity) return NextResponse.json({ error: "Programme not found." }, { status: 404 }); if (!entity.directorateId) return NextResponse.json({ error: "Programme must be assigned to a directorate before it can receive a budget." }, { status: 422 }); entityDirectorateId = entity.directorateId; }
     if (data.level === "PROJECT") { const [entity] = await db.select({ id: projects.id, programmeId: projects.programmeId }).from(projects).where(eq(projects.id, data.projectId!)).limit(1); if (!entity) return NextResponse.json({ error: "Project not found." }, { status: 404 }); entityProgrammeId = entity.programmeId; }
     if (data.level === "ACTIVITY") { const [entity] = await db.select({ id: activities.id, projectId: activities.projectId }).from(activities).where(eq(activities.id, data.activityId!)).limit(1); if (!entity) return NextResponse.json({ error: "Activity not found." }, { status: 404 }); entityProjectId = entity.projectId; }
