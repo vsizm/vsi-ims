@@ -29,9 +29,6 @@ const directorates = [
   ["OPS", "Directorate of Operations & Field Delivery", "Operational coordination, logistics and field implementation support."],
 ];
 
-// Existing programme codes remain authoritative. This repair only changes
-// their organisational parent and deactivates legacy thematic directorates;
-// it does not delete records or alter programme/project/activity ownership.
 const programmeDirectorate = {
   CEV: "PROG",
   EIE: "PROG",
@@ -44,6 +41,8 @@ const programmeDirectorate = {
   "E2E-2026": "PAR",
   CPRM: "CPRM",
 };
+
+const expectedCodes = new Set(directorates.map(([code]) => code));
 
 try {
   await sql.begin(async (tx) => {
@@ -74,14 +73,18 @@ try {
       `;
     }
 
-    // Preserve legacy data for audit/history, but remove it from the active
-    // organisational structure shown to users.
-    await tx`
-      UPDATE directorates
-      SET active = false, updated_at = now()
-      WHERE active = true
-        AND code NOT IN (${sql.unsafe(directorates.map(([code]) => `'${code}'`).join(","))})
-    `;
+    // Preserve legacy records for audit/history, but remove them from the
+    // active organisational structure shown to users.
+    const activeRows = await tx`SELECT id, code FROM directorates WHERE active = true`;
+    for (const row of activeRows) {
+      if (!expectedCodes.has(row.code)) {
+        await tx`
+          UPDATE directorates
+          SET active = false, updated_at = now()
+          WHERE id = ${row.id}
+        `;
+      }
+    }
   });
 
   const [orphans] = await Promise.all([
